@@ -1,0 +1,26 @@
+wing: ai-tunnel
+rooms:
+- name: infra
+  description: Docker Compose, Cloudflare Tunnel, and Nginx configuration
+  keywords:
+  - compose
+  - docker
+  - cloudflared
+  - nginx
+- name: docs
+  description: Setup guides, architecture notes, and operator documentation
+  keywords:
+  - docs
+  - readme
+- name: scripts
+  description: Developer automation, smoke tests, rendering helpers, and bootstrap scripts
+  keywords:
+  - scripts
+- name: vscode
+  description: VS Code workspace configuration for models, MCP, and tasks
+  keywords:
+  - .vscode
+  - vscode
+- name: general
+  description: Files that do not fit the other rooms
+  keywords: []

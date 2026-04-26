@@ -1,0 +1,9 @@
+services:
+  ollama:
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      GGML_VK_VISIBLE_DEVICES: ${GGML_VK_VISIBLE_DEVICES}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
+      OLLAMA_VULKAN: ${OLLAMA_VULKAN}

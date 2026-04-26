@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.data/
+.copilot-bridge/
+.vscode/
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+build/
+dist/
+*.py[cod]
+Thumbs.db
+.DS_Store

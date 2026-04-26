@@ -1,0 +1,94 @@
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE}
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
+    volumes:
+      - ./${OLLAMA_MODELS_PATH}:/root/.ollama
+    expose:
+      - "${OLLAMA_PORT}"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  ollama-pull:
+    image: ${OLLAMA_IMAGE}
+    restart: "no"
+    profiles:
+      - init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:${OLLAMA_PORT}
+    command: ["pull", "${OLLAMA_MODEL}"]
+    volumes:
+      - ./${OLLAMA_MODELS_PATH}:/root/.ollama
+    networks:
+      - internal
+
+  nginx:
+    image: ${NGINX_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      NGINX_LISTEN_PORT: ${NGINX_LISTEN_PORT}
+      OLLAMA_PORT: ${OLLAMA_PORT}
+      OLLAMA_API_HOSTNAME: ${OLLAMA_API_HOSTNAME}
+      OLLAMA_ADMIN_HOSTNAME: ${OLLAMA_ADMIN_HOSTNAME}
+      ENABLE_ADMIN_BASIC_AUTH: ${ENABLE_ADMIN_BASIC_AUTH}
+      ENABLE_RAW_OLLAMA_API: ${ENABLE_RAW_OLLAMA_API}
+      ENABLE_OPENAI_COMPAT_API: ${ENABLE_OPENAI_COMPAT_API}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE}
+      NGINX_PROXY_READ_TIMEOUT: ${NGINX_PROXY_READ_TIMEOUT}
+      NGINX_PROXY_SEND_TIMEOUT: ${NGINX_PROXY_SEND_TIMEOUT}
+      NGINX_RATE_LIMIT_RPS: ${NGINX_RATE_LIMIT_RPS}
+      NGINX_RATE_LIMIT_BURST: ${NGINX_RATE_LIMIT_BURST}
+      NGINX_API_TOKEN_FILE: /run/secrets/ollama-api-token
+      NGINX_BASIC_AUTH_FILE: /run/secrets/nginx-htpasswd
+    command: ["/bin/sh", "/usr/local/bin/render-config.sh"]
+    ports:
+      - "127.0.0.1:${NGINX_LISTEN_PORT}:${NGINX_LISTEN_PORT}"
+    volumes:
+      - ./nginx/nginx.conf:/opt/nginx/nginx.conf.template:ro
+      - ./nginx/conf.d/ollama.conf.template:/opt/nginx/ollama.conf.template:ro
+      - ./nginx/entrypoint/render-config.sh:/usr/local/bin/render-config.sh:ro
+      - ${NGINX_API_TOKEN_FILE}:/run/secrets/ollama-api-token:ro
+      - ${NGINX_BASIC_AUTH_FILE}:/run/secrets/nginx-htpasswd:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:${NGINX_LISTEN_PORT}/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE}
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    depends_on:
+      nginx:
+        condition: service_healthy
+    command: ["--config", "/etc/cloudflared/config.yml", "tunnel", "run"]
+    ports:
+      - "127.0.0.1:${CLOUDFLARED_METRICS_PORT}:${CLOUDFLARED_METRICS_PORT}"
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ${CF_TUNNEL_CREDENTIALS_FILE}:/run/secrets/cloudflared-credentials.json:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

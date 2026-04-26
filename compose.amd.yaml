@@ -1,0 +1,11 @@
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE_AMD}
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    environment:
+      HSA_OVERRIDE_GFX_VERSION: ${HSA_OVERRIDE_GFX_VERSION}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
+      ROCR_VISIBLE_DEVICES: ${ROCR_VISIBLE_DEVICES}

@@ -1,0 +1,55 @@
+server {
+    listen ${NGINX_LISTEN_PORT} default_server;
+    server_name _;
+    default_type application/json;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    return 404 '{"error":{"message":"Unknown host","type":"invalid_request_error"}}';
+}
+
+server {
+    listen ${NGINX_LISTEN_PORT};
+    server_name ${OLLAMA_API_HOSTNAME};
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location = / {
+        default_type application/json;
+        return 200 '{"service":"ollama-api","status":"ok","openai_compat":true}';
+    }
+
+    include /etc/nginx/includes/openai-api-location.inc;
+    include /etc/nginx/includes/raw-api-location-api.inc;
+}
+
+server {
+    listen ${NGINX_LISTEN_PORT};
+    server_name ${OLLAMA_ADMIN_HOSTNAME};
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    include /etc/nginx/includes/admin-auth.inc;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location = / {
+        default_type text/plain;
+        return 200 "Ollama admin host. Use /v1/models or /api/tags after authenticating.\n";
+    }
+
+    include /etc/nginx/includes/openai-admin-location.inc;
+    include /etc/nginx/includes/raw-api-location-admin.inc;
+}

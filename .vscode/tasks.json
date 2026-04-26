@@ -1,0 +1,984 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Stack: Start Local Services",
+      "type": "shell",
+      "command": "docker compose --env-file .env up -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Check NVIDIA GPU Support",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "nvidia"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+        {
+          "label": "Stack: Smoke Test Tool Calling",
+          "type": "shell",
+          "command": "py",
+          "args": [
+            "-3",
+            "scripts/check_tool_calling.py",
+            "--env-file",
+            ".env"
+          ],
+          "problemMatcher": []
+        },
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "nvidia"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check-accel.py",
+        "--env-file",
+        ".env",
+        "--provider",
+        "nvidia"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services (GPU / NVIDIA)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.gpu.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check NVIDIA GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Check AMD GPU Support",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "amd"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "amd"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check-accel.py",
+        "--env-file",
+        ".env",
+        "--provider",
+        "amd"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services (GPU / AMD ROCm)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.amd.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check AMD GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Check Vulkan GPU Support",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "vulkan"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check-accel.py",
+          "--env-file",
+          ".env",
+          "--provider",
+          "vulkan"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check-accel.py",
+        "--env-file",
+        ".env",
+        "--provider",
+        "vulkan"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services (GPU / Vulkan)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.vulkan.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check Vulkan GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Pull Default Model",
+      "type": "shell",
+      "command": "docker compose --env-file .env --profile init run --rm ollama-pull",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Tunnel",
+      "type": "shell",
+      "command": "docker compose --env-file .env --profile tunnel up -d cloudflared",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Smoke Test",
+      "type": "shell",
+      "command": "./scripts/smoke-test.sh",
+      "windows": {
+        "command": ".\\scripts\\smoke-test.ps1"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Bootstrap Secrets",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-secrets.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-secrets.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/bootstrap-secrets.py",
+        "--env-file",
+        ".env"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Rotate API Token",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/rotate-api-token.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/rotate-api-token.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/rotate-api-token.py",
+        "--env-file",
+        ".env"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Rotate API Token + Copy",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/rotate-api-token.py",
+          "--env-file",
+          ".env",
+          "--copy-to-clipboard"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/rotate-api-token.py",
+          "--env-file",
+          ".env",
+          "--copy-to-clipboard"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/rotate-api-token.py",
+        "--env-file",
+        ".env",
+        "--copy-to-clipboard"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "VS Code: Bootstrap User Space",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-vscode-user.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-vscode-user.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/bootstrap-vscode-user.py",
+        "--env-file",
+        ".env"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "VS Code: Bootstrap User Space + Copy API Key",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-vscode-user.py",
+          "--env-file",
+          ".env",
+          "--copy-api-key"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-vscode-user.py",
+          "--env-file",
+          ".env",
+          "--copy-api-key"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/bootstrap-vscode-user.py",
+        "--env-file",
+        ".env",
+        "--copy-api-key"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Memory: Bootstrap Bridge",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-workspace-memory.py",
+          "--workspace-root",
+          "."
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-workspace-memory.py",
+          "--workspace-root",
+          "."
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/bootstrap-workspace-memory.py",
+        "--workspace-root",
+        "."
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Memory: Bootstrap Bridge + Palace",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-workspace-memory.py",
+          "--workspace-root",
+          ".",
+          "--bootstrap-palace",
+          "--mine-limit",
+          "25",
+          "--smoke-http"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/bootstrap-workspace-memory.py",
+          "--workspace-root",
+          ".",
+          "--bootstrap-palace",
+          "--mine-limit",
+          "25",
+          "--smoke-http"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/bootstrap-workspace-memory.py",
+        "--workspace-root",
+        ".",
+        "--bootstrap-palace",
+        "--mine-limit",
+        "25",
+        "--smoke-http"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Add Or Update Model",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:modelId}",
+          "--display-name",
+          "${input:displayName}",
+          "--max-input-tokens",
+          "${input:maxInputTokens}",
+          "--max-output-tokens",
+          "${input:maxOutputTokens}",
+          "--tool-calling",
+          "${input:toolCalling}",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--set-default",
+          "${input:setDefault}",
+          "--pull",
+          "${input:pullModel}"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:modelId}",
+          "--display-name",
+          "${input:displayName}",
+          "--max-input-tokens",
+          "${input:maxInputTokens}",
+          "--max-output-tokens",
+          "${input:maxOutputTokens}",
+          "--tool-calling",
+          "${input:toolCalling}",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--set-default",
+          "${input:setDefault}",
+          "--pull",
+          "${input:pullModel}"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "add",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "${input:modelId}",
+        "--display-name",
+        "${input:displayName}",
+        "--max-input-tokens",
+        "${input:maxInputTokens}",
+        "--max-output-tokens",
+        "${input:maxOutputTokens}",
+        "--tool-calling",
+        "${input:toolCalling}",
+        "--thinking",
+        "${input:thinking}",
+        "--streaming",
+        "${input:streaming}",
+        "--set-default",
+        "${input:setDefault}",
+        "--pull",
+        "${input:pullModel}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Add Or Update Agent Model",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:agentModelId}",
+          "--display-name",
+          "${input:agentDisplayName}",
+          "--max-input-tokens",
+          "${input:maxInputTokens}",
+          "--max-output-tokens",
+          "${input:maxOutputTokens}",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true",
+          "--pull",
+          "${input:pullModel}"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:agentModelId}",
+          "--display-name",
+          "${input:agentDisplayName}",
+          "--max-input-tokens",
+          "${input:maxInputTokens}",
+          "--max-output-tokens",
+          "${input:maxOutputTokens}",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true",
+          "--pull",
+          "${input:pullModel}"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "add",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "${input:agentModelId}",
+        "--display-name",
+        "${input:agentDisplayName}",
+        "--max-input-tokens",
+        "${input:maxInputTokens}",
+        "--max-output-tokens",
+        "${input:maxOutputTokens}",
+        "--tool-calling",
+        "true",
+        "--thinking",
+        "${input:thinking}",
+        "--streaming",
+        "${input:streaming}",
+        "--env-slot",
+        "agent",
+        "--set-default",
+        "true",
+        "--pull",
+        "${input:pullModel}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull DeepSeek Math V2 (IQ1_S)",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S",
+          "--display-name",
+          "DeepSeek Math V2 Large (IQ1_S)",
+          "--max-input-tokens",
+          "4096",
+          "--max-output-tokens",
+          "4096",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--set-default",
+          "false",
+          "--pull",
+          "true"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S",
+          "--display-name",
+          "DeepSeek Math V2 Large (IQ1_S)",
+          "--max-input-tokens",
+          "4096",
+          "--max-output-tokens",
+          "4096",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--set-default",
+          "false",
+          "--pull",
+          "true"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "add",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "milkey/deepseek-v2.5-1210:IQ1_S",
+        "--display-name",
+        "DeepSeek Math V2 Large (IQ1_S)",
+        "--max-input-tokens",
+        "4096",
+        "--max-output-tokens",
+        "4096",
+        "--tool-calling",
+        "false",
+        "--thinking",
+        "true",
+        "--streaming",
+        "true",
+        "--set-default",
+        "false",
+        "--pull",
+        "true"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Configure DeepSeek Math V2 Large Agent",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S",
+          "--display-name",
+          "DeepSeek Math V2 Large (IQ1_S)",
+          "--max-input-tokens",
+          "4096",
+          "--max-output-tokens",
+          "4096",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true",
+          "--pull",
+          "true"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S",
+          "--display-name",
+          "DeepSeek Math V2 Large (IQ1_S)",
+          "--max-input-tokens",
+          "4096",
+          "--max-output-tokens",
+          "4096",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true",
+          "--pull",
+          "true"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "add",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "milkey/deepseek-v2.5-1210:IQ1_S",
+        "--display-name",
+        "DeepSeek Math V2 Large (IQ1_S)",
+        "--max-input-tokens",
+        "4096",
+        "--max-output-tokens",
+        "4096",
+        "--tool-calling",
+        "true",
+        "--thinking",
+        "true",
+        "--streaming",
+        "true",
+        "--env-slot",
+        "agent",
+        "--set-default",
+        "true",
+        "--pull",
+        "true"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Probe DeepSeek Math V2 (IQ1_S) Tool Calling",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env",
+          "--model-id",
+          "milkey/deepseek-v2.5-1210:IQ1_S"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check_tool_calling.py",
+        "--env-file",
+        ".env",
+        "--model-id",
+        "milkey/deepseek-v2.5-1210:IQ1_S"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull + Probe DeepSeek Math V2 (IQ1_S)",
+      "dependsOn": [
+        "Models: Pull DeepSeek Math V2 (IQ1_S)",
+        "Models: Probe DeepSeek Math V2 (IQ1_S) Tool Calling"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start workspaceMemoryBridge HTTP",
+      "type": "process",
+      "command": "python",
+      "linux": {
+        "command": "python3"
+      },
+      "osx": {
+        "command": "python3"
+      },
+      "args": [
+        "-m",
+        "workspace_memory_bridge.ensure_http",
+        "--workspace-root",
+        "${workspaceFolder}",
+        "--wing",
+        "ai-tunnel",
+        "--room-prefix",
+        "ai-tunnel",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "39741",
+        "--path",
+        "/mcp"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "focus": false,
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen",
+        "reevaluateOnRerun": true
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "modelId",
+      "type": "promptString",
+      "description": "Ollama model id",
+      "default": "deepseek-v2:16b-lite-chat-q4_K_M"
+    },
+    {
+      "id": "displayName",
+      "type": "promptString",
+      "description": "Display name in VS Code",
+      "default": "DeepSeek V2 Lite"
+    },
+    {
+      "id": "agentModelId",
+      "type": "promptString",
+      "description": "Tool-capable Ollama model id for agent mode",
+      "default": "milkey/deepseek-v2.5-1210:IQ1_S"
+    },
+    {
+      "id": "agentDisplayName",
+      "type": "promptString",
+      "description": "Tool-capable display name for agent mode",
+      "default": "DeepSeek Math V2 Large (IQ1_S)"
+    },
+    {
+      "id": "maxInputTokens",
+      "type": "promptString",
+      "description": "Maximum input tokens",
+      "default": "32768"
+    },
+    {
+      "id": "maxOutputTokens",
+      "type": "promptString",
+      "description": "Maximum output tokens",
+      "default": "8192"
+    },
+    {
+      "id": "toolCalling",
+      "type": "pickString",
+      "description": "Does the model support tool calling?",
+      "options": [
+        "true",
+        "false"
+      ],
+      "default": "false"
+    },
+    {
+      "id": "thinking",
+      "type": "pickString",
+      "description": "Does the model expose reasoning/thinking?",
+      "options": [
+        "true",
+        "false"
+      ],
+      "default": "true"
+    },
+    {
+      "id": "streaming",
+      "type": "pickString",
+      "description": "Should the model be marked as streaming-capable?",
+      "options": [
+        "true",
+        "false"
+      ],
+      "default": "true"
+    },
+    {
+      "id": "setDefault",
+      "type": "pickString",
+      "description": "Set this as the repo default model in .env?",
+      "options": [
+        "true",
+        "false"
+      ],
+      "default": "false"
+    },
+    {
+      "id": "pullModel",
+      "type": "pickString",
+      "description": "Pull the model into Ollama now?",
+      "options": [
+        "true",
+        "false"
+      ],
+      "default": "false"
+    }
+  ]
+}
