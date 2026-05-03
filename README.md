@@ -113,6 +113,7 @@ Create a sibling `ai-tunnel-secrets` directory one level up from the repo:
 ```text
 ../ai-tunnel-secrets/
 |-- cloudflared-token
+|-- deepseek-api-token
 |-- nginx-admin-password
 |-- ollama-api-token
 `-- nginx-htpasswd
@@ -121,6 +122,7 @@ Create a sibling `ai-tunnel-secrets` directory one level up from the repo:
 Secret usage:
 
 - `cloudflared-token` is mounted into the `cloudflared` container and used as the tunnel token file
+- `deepseek-api-token` is mounted into the optional DeepSeek adapter when you enable the remote hosted DeepSeek path
 - `nginx-admin-password` is the plaintext source of truth for admin Basic Auth
 - `ollama-api-token` is read by Nginx and enforced on the API hostname
 - `nginx-htpasswd` is the derived hash file used only when `ENABLE_ADMIN_BASIC_AUTH=true`
@@ -135,6 +137,12 @@ Fast path for a fresh clone:
 4. Bootstrap VS Code user settings so Copilot sees the `AI Tunnel` provider.
 5. On a machine that can host the larger package, configure the prewired `DeepSeek Math V2 Large (IQ1_S)` agent profile.
 6. Run the smoke tests.
+
+Known small proof model:
+
+- `qwen2.5:0.5b` is now wired in as a tiny local smoke model for quick chat-only stack checks when you want a fast local deployment before pulling anything larger
+- `qwen2.5:3b` is the smallest model currently verified in this repo to prove the full Nginx-backed OpenAI-compatible path end to end, including `scripts/check_tool_calling.py`
+- use it when you want to prove the stack before downloading the larger DeepSeek Math package
 
 Windows PowerShell:
 
@@ -192,8 +200,18 @@ Task-first alternative in VS Code:
 2. Run `Stack: Start Local Services`.
 3. Run `Stack: Pull Default Model`.
 4. Run `VS Code: Bootstrap User Space + Copy API Key`.
-5. Run `Models: Configure DeepSeek Math V2 Large Agent`.
-6. Run `Stack: Smoke Test` and `Stack: Smoke Test Tool Calling`.
+5. If you want a tiny local chat sanity check first, run `Models: Pull + Register Local Smoke Model (qwen2.5:0.5b)` and then `Stack: Smoke Test Local Smoke Model (qwen2.5:0.5b)`.
+6. If you want a small end-to-end tool-calling proof next, run `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)`.
+7. Run `Models: Configure DeepSeek Math V2 Large Agent` when you are ready to validate the larger agent profile.
+8. Run `Stack: Smoke Test` and `Stack: Smoke Test Tool Calling`.
+
+Remote DeepSeek path:
+
+- set `DEEPSEEK_ADAPTER_ENABLED=true` in `.env` when you want Copilot's `/v1` traffic to flow through the internal DeepSeek adapter instead of the local Ollama OpenAI pass-through
+- populate `../ai-tunnel-secrets/deepseek-api-token` with your upstream DeepSeek API key before starting the stack
+- run `Remote DeepSeek: Configure Chat Model` to register a remote chat model in `.env` and `.vscode/settings.json`
+- run `Remote DeepSeek: Configure Agent Model` to register the remote agent profile and verify a full tool round-trip directly against the upstream DeepSeek endpoint
+- run `Remote DeepSeek: Probe Agent Loop` if you want to re-check the upstream model without rewriting settings
 
 Public repo hygiene:
 
@@ -243,6 +261,8 @@ py -3 scripts/rotate-api-token.py --env-file .env --copy-to-clipboard
 ```
 
 That command rewrites `../ai-tunnel-secrets/ollama-api-token`, restarts `nginx`, and copies the new token to your clipboard so you can paste it back into `Chat: Manage Language Models`.
+
+After rotating the token, re-run `py -3 scripts/bootstrap-vscode-user.py --env-file .env` and reload VS Code Insiders so the local AI Tunnel BYOK bootstrap extension refreshes the token in VS Code SecretStorage.
 
 That bootstrap creates or preserves:
 
@@ -395,16 +415,13 @@ In VS Code Insiders:
 2. Run the bootstrap helper or task so the repo can register the model and provider in your user profile.
 3. Reload the VS Code window if it was already open.
 4. Open the Chat view.
-5. Run `Chat: Manage Language Models`.
-6. Select the `AI Tunnel` provider if it already exists, or add an `OpenAI Compatible` provider if you skipped the bootstrap helper.
-7. Paste the API key from `../ai-tunnel-secrets/ollama-api-token` if prompted.
-8. Make sure the model id matches `OLLAMA_MODEL_VSCODE_ID`.
-9. Select the model from the chat model picker.
+5. Select `AI Tunnel` from the chat model picker.
+6. If you want to inspect the generated provider, run `Chat: Manage Language Models` and open `AI Tunnel`.
 
 Important:
 
 - the bootstrap helper updates your VS Code user `settings.json` and `chatLanguageModels.json`, not just the workspace copy
-- the API key itself is stored by VS Code in secure storage, so the supported automation boundary is copying the token to your clipboard instead of writing it into JSON
+- the API key itself is stored by VS Code in secure storage; the bootstrap installs a local `ai-tunnel.byok-bootstrap` extension that reads the token file and lets VS Code write the `${input:chat.lm.secret...}` placeholder automatically
 - the display name can be friendly
 - the model id must match the actual Ollama model id unless you add a rewriting layer in front of Ollama
 
@@ -446,7 +463,23 @@ POSIX shell:
 
 Add `--chat` if you want to test a streaming chat completion after the model has been pulled.
 
-Add `--tool-calling` if you want to verify that the current agent profile can emit an OpenAI-style function call through the tunnel. The smoke helper prefers `OLLAMA_AGENT_MODEL` when that optional profile is configured and falls back to `OLLAMA_MODEL` otherwise.
+Add `--tool-calling` if you want to verify that the current agent profile can complete a full OpenAI-style tool round-trip through the tunnel. The smoke helper prefers `OLLAMA_AGENT_MODEL` when that optional profile is configured and falls back to `OLLAMA_MODEL` otherwise.
+
+Known-good proof path:
+
+- use `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)` if you want a smaller verified tool-calling model before testing the larger DeepSeek Math agent profile
+- that task pulls `qwen2.5:3b` into the Docker-backed Ollama store and runs the same `scripts/check_tool_calling.py` probe that the repo uses for OpenAI-compatible agent-loop validation
+
+If you need to validate a remote hosted endpoint directly instead of the local Nginx route, `scripts/check_tool_calling.py` also supports an explicit base URL:
+
+```powershell
+py -3 scripts/check_tool_calling.py \
+    --base-url https://your-remote-endpoint.example.com \
+    --api-token-file ..\ai-tunnel-secrets\ollama-api-token \
+    --model-id deepseek-v4-pro
+```
+
+Add `--host-header your-public-hostname.example.com` if the remote endpoint sits behind a reverse proxy that routes on `Host`.
 
 ## Model Management Tooling
 
@@ -461,7 +494,12 @@ Recommended split for Copilot:
 
 - keep `DeepSeek V2 Lite` as the default chat profile with `toolCalling=false`
 - use the preconfigured `OLLAMA_AGENT_*` profile for `DeepSeek Math V2 Large (IQ1_S)` in agent mode with `toolCalling=true`
-- let `modelctl.py` pull first and then probe tool calling before it writes that agent-capable profile unless you explicitly pass `--skip-tool-verification true`
+- let `modelctl.py` pull first and then verify a full tool round-trip before it writes that agent-capable profile unless you explicitly pass `--skip-tool-verification true`
+
+Remote DeepSeek alternative:
+
+- use `py -3 scripts/modelctl.py remote-deepseek ...` when you want to register a hosted DeepSeek model behind the internal adapter instead of pulling a local Ollama package
+- that path updates the `DEEPSEEK_*` adapter config in `.env`, writes the Copilot-facing model entry to `.vscode/settings.json`, and verifies tool calling directly against the upstream DeepSeek API when `toolCalling=true`
 
 Current limitation:
 
@@ -502,15 +540,36 @@ py -3 scripts/modelctl.py add \
     --pull true
 ```
 
-That path now pulls the model into Ollama first, then verifies tool calling through the local Nginx route, and only then writes `toolCalling=true` into the registered model entry.
+That path now pulls the model into Ollama first, then verifies a tool call plus tool-result round-trip through the local Nginx route, and only then writes `toolCalling=true` into the registered model entry.
+
+Remote DeepSeek example:
+
+```powershell
+py -3 scripts/modelctl.py remote-deepseek \
+    --env-file .env \
+    --settings-file .vscode/settings.json \
+    --model-id deepseek-v4-pro \
+    --display-name "DeepSeek V4 Pro" \
+    --api-base-url https://api.deepseek.com \
+    --api-token-file ..\ai-tunnel-secrets\deepseek-api-token \
+    --max-input-tokens 1000000 \
+    --max-output-tokens 8192 \
+    --tool-calling true \
+    --thinking true \
+    --streaming true \
+    --env-slot agent \
+    --set-default true
+```
+
+That path enables the internal DeepSeek adapter configuration in `.env`, keeps the Copilot-facing URL on the repo's public `/v1` endpoint, and verifies the upstream hosted model with the same full tool round-trip requirement before it records `toolCalling=true`.
 
 If you prefer the editor workflow, run the `Models: Add Or Update Model` task from the Command Palette.
 
 If you want the repo-managed agent slot instead of a one-off model entry, run `Models: Configure DeepSeek Math V2 Large Agent` for the default large-profile setup or `Models: Add Or Update Agent Model` for another tool-capable Ollama model id.
 
-For user-space registration, use [scripts/bootstrap-vscode-user.py](scripts/bootstrap-vscode-user.py) or the `VS Code: Bootstrap User Space` tasks. That helper updates the user-level provider metadata in `chatLanguageModels.json`, mirrors the model definition into user settings, and can copy the API token from `../ai-tunnel-secrets/ollama-api-token` to the clipboard for the final secure-storage step.
+For user-space registration, use [scripts/bootstrap-vscode-user.py](scripts/bootstrap-vscode-user.py) or the `VS Code: Bootstrap User Space` tasks. That helper updates the user-level provider metadata in `chatLanguageModels.json`, mirrors the model definition into user settings, and installs a local startup extension that stores the token from `../ai-tunnel-secrets/ollama-api-token` through VS Code's SecretStorage path.
 
-For token rotation after initial setup, use [scripts/rotate-api-token.py](scripts/rotate-api-token.py) or the `Stack: Rotate API Token` tasks. Nginx renders the bearer token into its generated include files at container startup, so rotating this secret requires an `nginx` restart. The helper handles that restart for you and can copy the new token to the clipboard for the VS Code secure-storage update.
+For token rotation after initial setup, use [scripts/rotate-api-token.py](scripts/rotate-api-token.py) or the `Stack: Rotate API Token` tasks. Nginx renders the bearer token into its generated include files at container startup, so rotating this secret requires an `nginx` restart. The helper handles that restart for you; then re-run the VS Code bootstrap task and reload Insiders so SecretStorage is refreshed.
 
 ## Workspace Memory Bridge
 

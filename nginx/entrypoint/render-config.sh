@@ -67,6 +67,11 @@ proxy_send_timeout ${NGINX_PROXY_SEND_TIMEOUT}s;
 proxy_connect_timeout 30s;
 EOF
 
+openai_proxy_pass_target="http://ollama_upstream"
+if is_true "${DEEPSEEK_ADAPTER_ENABLED:-false}"; then
+    openai_proxy_pass_target="http://deepseek-adapter:${DEEPSEEK_ADAPTER_PORT}"
+fi
+
 if is_true "${ENABLE_OPENAI_COMPAT_API:-true}"; then
     cat > "$include_dir/openai-api-location.inc" <<EOF
 location /v1/ {
@@ -74,7 +79,7 @@ location /v1/ {
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/api-auth.inc;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass http://ollama_upstream;
+    proxy_pass ${openai_proxy_pass_target};
 }
 EOF
 
@@ -83,7 +88,7 @@ location /v1/ {
     default_type application/json;
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass http://ollama_upstream;
+    proxy_pass ${openai_proxy_pass_target};
 }
 EOF
 else

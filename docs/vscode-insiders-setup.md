@@ -35,24 +35,36 @@ python3 scripts/bootstrap-vscode-user.py --env-file .env --copy-api-key
 What this helper does:
 
 - updates the user `github.copilot.chat.customOAIModels` entry in `settings.json`
-- updates `chatLanguageModels.json` with an `AI Tunnel` provider that points at `OLLAMA_API_PUBLIC_URL`
-- optionally copies the API key from `../ai-tunnel-secrets/ollama-api-token` to your clipboard
+- updates `chatLanguageModels.json` with an `AI Tunnel` OpenAI Compatible (`customoai`) provider and the repo-managed models
+- removes stale `AI Tunnel`/`CustomOAI` provider entries and empty `OpenAI Compatible` scaffolds
+- installs a tiny local VS Code extension that reads `../ai-tunnel-secrets/ollama-api-token` and stores it through VS Code's language-model SecretStorage path on reload
+- optionally copies the API key from `../ai-tunnel-secrets/ollama-api-token` to your clipboard as a manual fallback
+- clears the Copilot Chat CustomOAI BYOK migration flag (see "Why The Reset Is Necessary" below)
 
-If you want to target the stable VS Code profile instead of Insiders, add `--channel stable`.
+If you want to target the stable VS Code profile instead of Insiders, add `--channel stable`. Pass `--no-reset-byok-migration` if you want to keep the current Copilot BYOK state untouched.
 
 1. Open VS Code Insiders.
 2. Run the bootstrap helper or one of the `VS Code: Bootstrap User Space` tasks from this repo.
 3. Reload the window if VS Code was already open.
 4. Open the Chat view.
-5. Run `Chat: Manage Language Models` from the Command Palette.
-6. Select the `AI Tunnel` provider if it already exists, or choose `Add Models` and `OpenAI Compatible` if you skipped the bootstrap helper.
-7. Enter the API key as the contents of `../ai-tunnel-secrets/ollama-api-token`.
-8. Add the model entry for the default profile described below if it is not already present.
-9. Select the model from the chat model picker.
+5. Select `AI Tunnel` from the chat model picker.
+6. If you want to inspect the generated provider, run `Chat: Manage Language Models` from the Command Palette and open `AI Tunnel`.
 
 If you are working from this repository, you can manage the workspace model entries with [scripts/modelctl.py](scripts/modelctl.py) or the `Models: Add Or Update Model` task in [.vscode/tasks.json](.vscode/tasks.json) instead of editing the JSON by hand.
 
-The remaining API key step is intentionally left in the UI. VS Code stores those credentials in secure storage, not in `settings.json` or `chatLanguageModels.json`, so the repo-supported automation boundary is provider registration plus clipboard handoff.
+VS Code still stores the credential in secure storage rather than plaintext JSON. The repo automates that by installing `ai-tunnel.byok-bootstrap`, a local startup extension under the VS Code user extensions directory. On activation it reads the token file, invokes VS Code's internal `lm.addLanguageModelsProviderGroup` command, and lets VS Code replace the plaintext token with a `${input:chat.lm.secret...}` placeholder in `chatLanguageModels.json`.
+
+## Why The Reset Is Necessary
+
+In Copilot Chat 0.47.x, `github.copilot.chat.customOAIModels` is registered in the extension's deprecated configuration namespace. On activation, the `CustomOAI` BYOK provider runs a one-time migration that copies entries from that setting into Copilot's internal BYOK provider list and gates the operation with a flag in the extension's `globalState`.
+
+The bundled extension constructs that gate key by interpolating the *config object* itself, so it ends up as the literal string `copilot-byok-migration-CustomOAI-[object Object]`. Once that flag flips to `true`, the migration never runs again — even if you later edit `customOAIModels` to fix a URL, add a new model, or change capabilities. The result is that the `AI Tunnel` provider and its models do not appear in the chat model picker after a reload, even though the JSON in `settings.json` is correct.
+
+By contrast, Ollama appears reliably because Copilot Chat ships a separate built-in BYOK provider that auto-discovers models from `chat.byok.ollamaEndpoint` (default `http://localhost:11434/api/tags`) on every reload — no migration, no settings entries, no API key. If you have `ollama` installed locally, it will always show up regardless of this repo's state.
+
+The bootstrap helper now clears the buggy migration flag at the end of every run and writes the current `customoai` provider directly into `chatLanguageModels.json`. You can also run the reset on its own with the `VS Code: Reset Copilot BYOK Migration` task or `scripts/reset-byok-migration.py`. Close VS Code Insiders before running the reset so the SQLite database in `globalStorage/state.vscdb` is not locked.
+
+The startup extension handles the secure-storage step automatically. If the extension cannot activate because Copilot BYOK is disabled by policy, `AI Tunnel` will remain visible in JSON but no token placeholder will be created.
 
 ## Rotating The API Key Later
 
@@ -78,9 +90,8 @@ What this does:
 
 After the helper finishes:
 
-1. Run `Chat: Manage Language Models`.
-2. Open the `AI Tunnel` provider.
-3. Replace the stored API key with the new token.
+1. Re-run `scripts/bootstrap-vscode-user.py --env-file .env` or the `VS Code: Bootstrap User Space` task.
+2. Reload VS Code Insiders so the local BYOK bootstrap extension refreshes the provider token in SecretStorage.
 
 ## Optional Workspace Memory
 
@@ -161,5 +172,6 @@ After configuration:
 1. Confirm the model appears in the chat model picker.
 2. Send a simple prompt and verify a response is returned.
 3. Send a longer prompt and confirm streaming feels incremental instead of buffered.
-4. Run `Models: Configure DeepSeek Math V2 Large Agent` for the repo default large-profile setup on a fresh machine, or use `py -3 scripts/check_tool_calling.py --env-file .env --model-id <agent-model-id>` before marking another model agent-capable.
-5. If the model does not appear in agent mode, treat that as a tool-calling capability limitation rather than a tunnel failure.
+4. If you want a small known-good proof first, run `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)`.
+5. Run `Models: Configure DeepSeek Math V2 Large Agent` for the repo default large-profile setup on a fresh machine, or use `py -3 scripts/check_tool_calling.py --env-file .env --model-id <agent-model-id>` before marking another model agent-capable.
+6. If the model does not appear in agent mode, treat that as a tool-calling capability limitation rather than a tunnel failure.

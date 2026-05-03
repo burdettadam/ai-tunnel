@@ -2,7 +2,7 @@
   "github.copilot.chat.customOAIModels": {
     "deepseek-v2:16b-lite-chat-q4_K_M": {
       "name": "DeepSeek V2 Lite",
-      "url": "https://ollama-api.example.com/v1",
+      "url": "https://ollama-api.korwynne.com/v1",
       "maxInputTokens": 32768,
       "maxOutputTokens": 8192,
       "toolCalling": false,
@@ -12,10 +12,30 @@
     },
     "milkey/deepseek-v2.5-1210:IQ1_S": {
       "name": "DeepSeek Math V2 Large (IQ1_S)",
-      "url": "https://ollama-api.example.com/v1",
+      "url": "https://ollama-api.korwynne.com/v1",
       "maxInputTokens": 4096,
       "maxOutputTokens": 4096,
       "toolCalling": true,
+      "vision": false,
+      "thinking": true,
+      "streaming": true
+    },
+    "qwen2.5:3b": {
+      "name": "Qwen 2.5 3B (Chat + Agent)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 32768,
+      "maxOutputTokens": 4096,
+      "toolCalling": true,
+      "vision": false,
+      "thinking": true,
+      "streaming": true
+    },
+    "qwen2.5:0.5b": {
+      "name": "Qwen 2.5 0.5B (Local Smoke)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 32768,
+      "maxOutputTokens": 2048,
+      "toolCalling": false,
       "vision": false,
       "thinking": true,
       "streaming": true

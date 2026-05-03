@@ -45,6 +45,7 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
         self.user_dir = self.root / "user"
         self.settings_path = self.user_dir / "settings.json"
         self.chat_models_path = self.user_dir / "chatLanguageModels.json"
+        self.workspace_settings_path = self.workspace / ".vscode" / "settings.json"
 
     def run_bootstrap(self, *args: str) -> subprocess.CompletedProcess[str]:
         command = [
@@ -54,6 +55,8 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
             str(self.env_path),
             "--settings-file",
             str(self.settings_path),
+            "--workspace-settings-file",
+            str(self.workspace_settings_path),
             "--chat-models-file",
             str(self.chat_models_path),
             *args,
@@ -86,13 +89,25 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
             [
                 {
                     "name": "AI Tunnel",
-                    "vendor": "openai",
-                    "url": "https://ollama-api.example.com/v1",
+                    "vendor": "customoai",
+                    "models": [
+                        {
+                            "id": "deepseek-v2:16b-lite-chat-q4_K_M",
+                            "name": "DeepSeek V2 Lite",
+                            "url": "https://ollama-api.example.com/v1",
+                            "maxInputTokens": 32768,
+                            "maxOutputTokens": 8192,
+                            "toolCalling": False,
+                            "vision": False,
+                            "thinking": True,
+                            "streaming": True,
+                        }
+                    ],
                 }
             ],
         )
         self.assertIn("Registered model 'deepseek-v2:16b-lite-chat-q4_K_M'", result.stdout)
-        self.assertIn("Added provider 'AI Tunnel'", result.stdout)
+        self.assertIn("Configured provider 'AI Tunnel' as OpenAI Compatible", result.stdout)
 
     def test_updates_existing_provider_without_duplication(self) -> None:
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,6 +143,18 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
                         "name": "AI Tunnel",
                         "vendor": "openai",
                         "url": "https://old.example.com/v1"
+                    },
+                    {
+                        "name": "CustomOAI",
+                        "vendor": "customoai",
+                        "apiKey": "${input:chat.lm.secret.test}",
+                        "models": [
+                            {
+                                "name": "Old Name",
+                                "url": "https://old.example.com/v1",
+                                "id": "deepseek-v2:16b-lite-chat-q4_K_M"
+                            }
+                        ]
                     }
                 ],
                 indent=2,
@@ -151,7 +178,10 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
         self.assertEqual(chat_models[0]["name"], "Copilot")
         self.assertEqual(chat_models[1]["name"], "Ollama")
         self.assertEqual(chat_models[2]["name"], "AI Tunnel")
-        self.assertEqual(chat_models[2]["url"], "https://ollama-api.example.com/v1")
+        self.assertEqual(chat_models[2]["vendor"], "customoai")
+        self.assertEqual(chat_models[2]["apiKey"], "${input:chat.lm.secret.test}")
+        self.assertEqual(chat_models[2]["models"][0]["url"], "https://ollama-api.example.com/v1")
+        self.assertNotIn("CustomOAI", [entry["name"] for entry in chat_models])
 
     def test_registers_optional_agent_profile(self) -> None:
         self.env_path.write_text(
@@ -193,6 +223,98 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
         self.assertEqual(model_entries["qwen2.5-coder:7b"]["maxInputTokens"], 65536)
         self.assertEqual(model_entries["qwen2.5-coder:7b"]["maxOutputTokens"], 4096)
         self.assertIn("Registered model 'qwen2.5-coder:7b'", result.stdout)
+
+    def test_prefers_remote_deepseek_slot_metadata_when_present(self) -> None:
+        self.env_path.write_text(
+            textwrap.dedent(
+                """
+                OLLAMA_API_PUBLIC_URL=https://deepseek-api.example.com/v1
+                DEEPSEEK_CHAT_MODEL=deepseek-v4-flash
+                DEEPSEEK_CHAT_MODEL_DISPLAY_NAME=DeepSeek V4 Flash
+                DEEPSEEK_CHAT_MODEL_VSCODE_ID=deepseek-v4-flash
+                DEEPSEEK_CHAT_CONTEXT_LENGTH=1000000
+                DEEPSEEK_CHAT_MAX_OUTPUT_TOKENS=8192
+                DEEPSEEK_CHAT_MODEL_TOOL_CALLING=false
+                DEEPSEEK_CHAT_MODEL_THINKING=true
+                DEEPSEEK_CHAT_MODEL_STREAMING=true
+                DEEPSEEK_AGENT_MODEL=deepseek-v4-pro
+                DEEPSEEK_AGENT_MODEL_DISPLAY_NAME=DeepSeek V4 Pro
+                DEEPSEEK_AGENT_MODEL_VSCODE_ID=deepseek-v4-pro
+                DEEPSEEK_AGENT_CONTEXT_LENGTH=1000000
+                DEEPSEEK_AGENT_MAX_OUTPUT_TOKENS=8192
+                DEEPSEEK_AGENT_MODEL_TOOL_CALLING=true
+                DEEPSEEK_AGENT_MODEL_THINKING=true
+                DEEPSEEK_AGENT_MODEL_STREAMING=true
+                NGINX_API_TOKEN_FILE=../ai-tunnel-secrets/ollama-api-token
+                """
+            ).strip()
+            + "\n",
+            encoding="utf-8",
+        )
+
+        self.run_bootstrap()
+
+        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        model_entries = settings["github.copilot.chat.customOAIModels"]
+
+        self.assertIn("deepseek-v4-flash", model_entries)
+        self.assertIn("deepseek-v4-pro", model_entries)
+        self.assertEqual(model_entries["deepseek-v4-flash"]["url"], "https://deepseek-api.example.com/v1")
+        self.assertEqual(model_entries["deepseek-v4-flash"]["maxInputTokens"], 1000000)
+        self.assertFalse(model_entries["deepseek-v4-flash"]["toolCalling"])
+        self.assertTrue(model_entries["deepseek-v4-pro"]["toolCalling"])
+
+    def test_merges_workspace_custom_models_into_user_settings(self) -> None:
+        self.workspace_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.workspace_settings_path.write_text(
+            json.dumps(
+                {
+                    "github.copilot.chat.customOAIModels": {
+                        "qwen2.5:0.5b": {
+                            "name": "Qwen 2.5 0.5B (Local Smoke)",
+                            "url": "https://old.example.com/v1",
+                            "maxInputTokens": 32768,
+                            "maxOutputTokens": 2048,
+                            "toolCalling": False,
+                            "vision": False,
+                            "thinking": True,
+                            "streaming": True,
+                        }
+                    }
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        self.run_bootstrap()
+
+        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        model_entries = settings["github.copilot.chat.customOAIModels"]
+        self.assertIn("qwen2.5:0.5b", model_entries)
+        self.assertEqual(model_entries["qwen2.5:0.5b"]["name"], "Qwen 2.5 0.5B (Local Smoke)")
+        self.assertEqual(model_entries["qwen2.5:0.5b"]["url"], "https://ollama-api.example.com/v1")
+        self.assertFalse(model_entries["qwen2.5:0.5b"]["toolCalling"])
+
+    def test_installs_byok_bootstrap_extension_when_extensions_dir_is_explicit(self) -> None:
+        extensions_dir = self.root / "extensions"
+
+        result = self.run_bootstrap("--extensions-dir", str(extensions_dir))
+
+        extension_dir = extensions_dir / "ai-tunnel.byok-bootstrap-0.0.1"
+        package_json = json.loads((extension_dir / "package.json").read_text(encoding="utf-8"))
+        config_json = json.loads((extension_dir / "ai-tunnel-config.json").read_text(encoding="utf-8"))
+        extension_js = (extension_dir / "extension.js").read_text(encoding="utf-8")
+
+        self.assertEqual(package_json["publisher"], "ai-tunnel")
+        self.assertIn("GitHub.copilot-chat", package_json["extensionDependencies"])
+        self.assertEqual(config_json["providerName"], "AI Tunnel")
+        self.assertEqual(config_json["chatModelsFile"], str(self.chat_models_path.resolve()))
+        self.assertEqual(config_json["apiTokenPath"], str((self.secrets_dir / "ollama-api-token").resolve()))
+        self.assertEqual(config_json["models"][0]["id"], "deepseek-v2:16b-lite-chat-q4_K_M")
+        self.assertIn("lm.addLanguageModelsProviderGroup", extension_js)
+        self.assertIn("Installed AI Tunnel BYOK bootstrap extension", result.stdout)
 
 
 if __name__ == "__main__":

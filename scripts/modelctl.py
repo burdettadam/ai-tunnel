@@ -7,7 +7,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from check_tool_calling import ToolCallingProbeError, probe_tool_calling_through_nginx
+from check_tool_calling import (
+    ToolCallingProbeError,
+    probe_tool_calling_direct,
+    probe_tool_calling_through_nginx,
+    resolve_direct_api_token,
+)
 
 
 def parse_bool(value: str) -> bool:
@@ -80,6 +85,66 @@ def build_env_updates(args: argparse.Namespace) -> dict[str, str]:
         f"{profile_key_prefix}MODEL_THINKING": str(args.thinking).lower(),
         f"{profile_key_prefix}MODEL_STREAMING": str(args.streaming).lower(),
     }
+
+
+def merge_model_map(existing_value: str, model_id: str, upstream_model_id: str) -> str:
+    model_map: dict[str, str] = {}
+    stripped = existing_value.strip()
+    if stripped:
+        loaded = json.loads(stripped)
+        if not isinstance(loaded, dict):
+            raise ValueError("Expected DEEPSEEK_MODEL_MAP_JSON to contain a JSON object")
+        model_map = {str(key): str(value) for key, value in loaded.items()}
+    model_map[model_id] = upstream_model_id
+    return json.dumps(model_map, separators=(",", ":"))
+
+
+def build_remote_deepseek_env_updates(args: argparse.Namespace, existing_values: dict[str, str]) -> dict[str, str]:
+    updates = {
+        "DEEPSEEK_ADAPTER_ENABLED": "true",
+        "DEEPSEEK_BACKEND_BASE_URL": args.api_base_url,
+        "DEEPSEEK_MODEL_MAP_JSON": merge_model_map(
+            existing_values.get("DEEPSEEK_MODEL_MAP_JSON", ""),
+            args.model_id,
+            args.upstream_model_id or args.model_id,
+        ),
+    }
+    if args.set_default:
+        profile_key_prefix = "DEEPSEEK_AGENT_" if args.env_slot == "agent" else "DEEPSEEK_CHAT_"
+        updates.update(
+            {
+                f"{profile_key_prefix}MODEL": args.model_id,
+                f"{profile_key_prefix}MODEL_DISPLAY_NAME": args.display_name,
+                f"{profile_key_prefix}MODEL_VSCODE_ID": args.model_id,
+                f"{profile_key_prefix}CONTEXT_LENGTH": str(args.max_input_tokens),
+                f"{profile_key_prefix}MAX_OUTPUT_TOKENS": str(args.max_output_tokens),
+                f"{profile_key_prefix}MODEL_TOOL_CALLING": str(args.tool_calling).lower(),
+                f"{profile_key_prefix}MODEL_VISION": str(args.vision).lower(),
+                f"{profile_key_prefix}MODEL_THINKING": str(args.thinking).lower(),
+                f"{profile_key_prefix}MODEL_STREAMING": str(args.streaming).lower(),
+            }
+        )
+    return updates
+
+
+def resolve_public_url(override: str | None, *env_groups: dict[str, str]) -> str:
+    if override and override.strip():
+        return override.strip()
+
+    for values in env_groups:
+        candidate = values.get("AI_TUNNEL_API_PUBLIC_URL", "").strip()
+        if candidate:
+            return candidate
+        candidate = values.get("OLLAMA_API_PUBLIC_URL", "").strip()
+        if candidate:
+            return candidate
+
+    for values in env_groups:
+        api_hostname = values.get("OLLAMA_API_HOSTNAME", "").strip()
+        if api_hostname:
+            return f"https://{api_hostname}/v1"
+
+    raise KeyError("OLLAMA_API_HOSTNAME, OLLAMA_API_PUBLIC_URL, or AI_TUNNEL_API_PUBLIC_URL is missing from the env file")
 
 
 def docker_command() -> str:
@@ -174,6 +239,51 @@ def register_model(args: argparse.Namespace) -> int:
     return 0
 
 
+def register_remote_deepseek(args: argparse.Namespace) -> int:
+    env_path = Path(args.env_file)
+    if not env_path.exists():
+        raise FileNotFoundError(f"Missing env file: {env_path}")
+
+    _, env_values_before = read_env_file(env_path)
+    env_updates = build_remote_deepseek_env_updates(args, env_values_before)
+
+    if args.tool_calling and not args.skip_tool_verification:
+        api_token = resolve_direct_api_token(api_token=args.api_token, api_token_file=args.api_token_file)
+        verification = probe_tool_calling_direct(
+            base_url=args.api_base_url,
+            api_token=api_token,
+            model_id=args.upstream_model_id or args.model_id,
+            chat_completions_path=args.chat_completions_path,
+            timeout=args.tool_verification_timeout,
+        )
+        function_name = verification["tool_call"]["function"]["name"]
+        print(f"Verified tool calling for '{args.upstream_model_id or args.model_id}' via function '{function_name}'")
+    elif args.tool_calling:
+        print(f"Skipping tool-calling verification for '{args.upstream_model_id or args.model_id}'")
+
+    env_values = update_env_file(env_path, env_updates)
+    public_url = resolve_public_url(args.public_url, env_values, env_values_before)
+
+    settings_path = Path(args.settings_file)
+    settings = load_settings(settings_path)
+    model_entries = settings.setdefault("github.copilot.chat.customOAIModels", {})
+    model_entries[args.model_id] = {
+        "name": args.display_name,
+        "url": public_url,
+        "maxInputTokens": args.max_input_tokens,
+        "maxOutputTokens": args.max_output_tokens,
+        "toolCalling": args.tool_calling,
+        "vision": args.vision,
+        "thinking": args.thinking,
+        "streaming": args.streaming,
+    }
+    save_settings(settings_path, settings)
+
+    print(f"Registered model '{args.model_id}' in {settings_path}")
+    print(f"Configured remote DeepSeek backend in {env_path}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage Ollama and VS Code model metadata for this repo")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -195,6 +305,29 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--tool-verification-timeout", type=float, default=30.0)
     add_parser.add_argument("--pull", type=parse_bool, default=False)
     add_parser.set_defaults(func=register_model)
+
+    remote_parser = subparsers.add_parser("remote-deepseek", help="Register a remote hosted DeepSeek model behind the local adapter")
+    remote_parser.add_argument("--env-file", default=".env")
+    remote_parser.add_argument("--settings-file", default=".vscode/settings.json")
+    remote_parser.add_argument("--model-id", required=True)
+    remote_parser.add_argument("--upstream-model-id")
+    remote_parser.add_argument("--display-name", required=True)
+    remote_parser.add_argument("--api-base-url", required=True)
+    remote_parser.add_argument("--api-token")
+    remote_parser.add_argument("--api-token-file")
+    remote_parser.add_argument("--public-url")
+    remote_parser.add_argument("--chat-completions-path", default="/chat/completions")
+    remote_parser.add_argument("--max-input-tokens", type=int, default=32768)
+    remote_parser.add_argument("--max-output-tokens", type=int, default=8192)
+    remote_parser.add_argument("--tool-calling", type=parse_bool, default=False)
+    remote_parser.add_argument("--vision", type=parse_bool, default=False)
+    remote_parser.add_argument("--thinking", type=parse_bool, default=True)
+    remote_parser.add_argument("--streaming", type=parse_bool, default=True)
+    remote_parser.add_argument("--env-slot", choices=["default", "agent"], default="default")
+    remote_parser.add_argument("--set-default", type=parse_bool, default=False)
+    remote_parser.add_argument("--skip-tool-verification", type=parse_bool, default=False)
+    remote_parser.add_argument("--tool-verification-timeout", type=float, default=30.0)
+    remote_parser.set_defaults(func=register_remote_deepseek)
 
     return parser
 

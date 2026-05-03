@@ -44,6 +44,10 @@ set +a
 
 api_token=$(tr -d '\r\n' < "$NGINX_API_TOKEN_FILE")
 base_url="http://127.0.0.1:${NGINX_LISTEN_PORT}"
+chat_model_id="$model_id"
+if [ -z "$chat_model_id" ]; then
+    chat_model_id="$OLLAMA_MODEL"
+fi
 
 echo "Checking /v1/models through Nginx"
 curl -fsS \
@@ -58,7 +62,7 @@ if [ "$run_chat" = true ]; then
         -H "Host: ${OLLAMA_API_HOSTNAME}" \
         -H "Authorization: Bearer ${api_token}" \
         -H 'Content-Type: application/json' \
-        -d "{\"model\":\"${OLLAMA_MODEL}\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with ok.\"}]}" \
+        -d "{\"model\":\"${chat_model_id}\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with ok.\"}]}" \
         "${base_url}/v1/chat/completions"
     echo
 fi

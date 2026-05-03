@@ -16,6 +16,7 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "modelctl.py"
 
 class _ProbeRequestHandler(BaseHTTPRequestHandler):
     response_payload: dict = {}
+    response_payloads: list[dict] | None = None
     requests: list[dict] = []
     docker_log_path: Path | None = None
 
@@ -34,7 +35,14 @@ class _ProbeRequestHandler(BaseHTTPRequestHandler):
                 "docker_log_lines": docker_log_lines,
             }
         )
-        response_body = json.dumps(self.__class__.response_payload).encode("utf-8")
+        payloads = self.__class__.response_payloads
+        if payloads is not None:
+            if len(self.__class__.requests) > len(payloads):
+                raise AssertionError("Probe server received more requests than configured responses")
+            response_payload = payloads[len(self.__class__.requests) - 1]
+        else:
+            response_payload = self.__class__.response_payload
+        response_body = json.dumps(response_payload).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(response_body)))
@@ -81,11 +89,16 @@ class ModelCtlTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_modelctl(self, *args: str, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    def run_modelctl(
+        self,
+        *args: str,
+        subcommand: str = "add",
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         command = [
             sys.executable,
             str(SCRIPT_PATH),
-            "add",
+            subcommand,
             "--env-file",
             str(self.env_path),
             "--settings-file",
@@ -97,8 +110,18 @@ class ModelCtlTests(unittest.TestCase):
             env.update(extra_env)
         return subprocess.run(command, capture_output=True, text=True, cwd=str(REPO_ROOT), check=False, env=env)
 
-    def start_probe_server(self, payload: dict, *, docker_log_path: Path | None = None) -> tuple[ThreadingHTTPServer, threading.Thread, int]:
-        _ProbeRequestHandler.response_payload = payload
+    def start_probe_server(
+        self,
+        payload: dict | list[dict],
+        *,
+        docker_log_path: Path | None = None,
+    ) -> tuple[ThreadingHTTPServer, threading.Thread, int]:
+        if isinstance(payload, list):
+            _ProbeRequestHandler.response_payloads = payload
+            _ProbeRequestHandler.response_payload = {}
+        else:
+            _ProbeRequestHandler.response_payloads = None
+            _ProbeRequestHandler.response_payload = payload
         _ProbeRequestHandler.requests = []
         _ProbeRequestHandler.docker_log_path = docker_log_path
         server = ThreadingHTTPServer(("127.0.0.1", 0), _ProbeRequestHandler)
@@ -110,26 +133,39 @@ class ModelCtlTests(unittest.TestCase):
         return server, thread, server.server_address[1]
 
     def test_agent_slot_requires_successful_tool_probe(self) -> None:
-        payload = {
-            "choices": [
-                {
-                    "finish_reason": "tool_calls",
-                    "message": {
-                        "role": "assistant",
-                        "tool_calls": [
-                            {
-                                "id": "call_1",
-                                "type": "function",
-                                "function": {
-                                    "name": "report_ready",
-                                    "arguments": json.dumps({"status": "ok"}),
-                                },
-                            }
-                        ],
-                    },
-                }
-            ]
-        }
+        payload = [
+            {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_ready",
+                                        "arguments": json.dumps({"status": "ok"}),
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "Readiness confirmed.",
+                        },
+                    }
+                ]
+            },
+        ]
         _, _, port = self.start_probe_server(payload)
         self.write_env(port)
 
@@ -156,10 +192,86 @@ class ModelCtlTests(unittest.TestCase):
         env_text = self.env_path.read_text(encoding="utf-8")
         self.assertIn("OLLAMA_AGENT_MODEL=qwen2.5-coder:7b", env_text)
         self.assertIn("OLLAMA_AGENT_MODEL_TOOL_CALLING=true", env_text)
-        self.assertEqual(len(_ProbeRequestHandler.requests), 1)
+        self.assertEqual(len(_ProbeRequestHandler.requests), 2)
         self.assertEqual(_ProbeRequestHandler.requests[0]["path"], "/v1/chat/completions")
         self.assertEqual(_ProbeRequestHandler.requests[0]["host"], "ollama-api.example.com")
         self.assertEqual(_ProbeRequestHandler.requests[0]["authorization"], "Bearer example-secret-token")
+        second_messages = _ProbeRequestHandler.requests[1]["body"]["messages"]
+        self.assertEqual(second_messages[-1], {"role": "tool", "tool_call_id": "call_1", "content": json.dumps({"status": "ok"})})
+
+    def test_remote_deepseek_registration_updates_backend_config_and_settings(self) -> None:
+        payload = [
+            {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_ready",
+                                        "arguments": json.dumps({"status": "ok"}),
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "Ready.",
+                        },
+                    }
+                ]
+            },
+        ]
+        _, _, port = self.start_probe_server(payload)
+        self.write_env(port)
+
+        result = self.run_modelctl(
+            "--model-id",
+            "deepseek-v4-pro",
+            "--display-name",
+            "DeepSeek V4 Pro",
+            "--api-base-url",
+            f"http://127.0.0.1:{port}",
+            "--api-token",
+            "example-upstream-token",
+            "--tool-calling",
+            "true",
+            "--set-default",
+            "true",
+            subcommand="remote-deepseek",
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Verified tool calling for 'deepseek-v4-pro'", result.stdout)
+        self.assertIn("Configured remote DeepSeek backend", result.stdout)
+        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        entry = settings["github.copilot.chat.customOAIModels"]["deepseek-v4-pro"]
+        self.assertEqual(entry["name"], "DeepSeek V4 Pro")
+        self.assertEqual(entry["url"], "https://ollama-api.example.com/v1")
+        self.assertTrue(entry["toolCalling"])
+        env_text = self.env_path.read_text(encoding="utf-8")
+        self.assertIn("DEEPSEEK_ADAPTER_ENABLED=true", env_text)
+        self.assertIn(f"DEEPSEEK_BACKEND_BASE_URL=http://127.0.0.1:{port}", env_text)
+        self.assertIn("DEEPSEEK_CHAT_MODEL=deepseek-v4-pro", env_text)
+        self.assertIn("DEEPSEEK_CHAT_MODEL_DISPLAY_NAME=DeepSeek V4 Pro", env_text)
+        self.assertIn("DEEPSEEK_CHAT_MODEL_VSCODE_ID=deepseek-v4-pro", env_text)
+        self.assertIn("DEEPSEEK_CHAT_CONTEXT_LENGTH=32768", env_text)
+        self.assertIn("DEEPSEEK_CHAT_MAX_OUTPUT_TOKENS=8192", env_text)
+        self.assertIn("DEEPSEEK_MODEL_MAP_JSON={\"deepseek-v4-pro\":\"deepseek-v4-pro\"}", env_text)
+        self.assertEqual(len(_ProbeRequestHandler.requests), 2)
+        self.assertEqual(_ProbeRequestHandler.requests[0]["path"], "/chat/completions")
+        self.assertEqual(_ProbeRequestHandler.requests[0]["authorization"], "Bearer example-upstream-token")
 
     def test_tool_probe_failure_blocks_tool_capable_registration(self) -> None:
         payload = {
@@ -197,6 +309,71 @@ class ModelCtlTests(unittest.TestCase):
         env_text = self.env_path.read_text(encoding="utf-8")
         self.assertNotIn("OLLAMA_AGENT_MODEL=qwen2.5-coder:7b", env_text)
 
+    def test_roundtrip_failure_blocks_tool_capable_registration(self) -> None:
+        payload = [
+            {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_ready",
+                                        "arguments": json.dumps({"status": "ok"}),
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_2",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_ready",
+                                        "arguments": json.dumps({"status": "ok"}),
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+        ]
+        _, _, port = self.start_probe_server(payload)
+        self.write_env(port)
+
+        result = self.run_modelctl(
+            "--model-id",
+            "qwen2.5-coder:7b",
+            "--display-name",
+            "Qwen 2.5 Coder 7B (Agent)",
+            "--tool-calling",
+            "true",
+            "--env-slot",
+            "agent",
+            "--set-default",
+            "true",
+            "--pull",
+            "false",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Tool-result round-trip did not finish with a final answer", result.stderr)
+        self.assertFalse(self.settings_path.exists())
+
     def test_pull_happens_before_tool_probe_for_tool_capable_models(self) -> None:
         docker_bin_dir = self.root / "bin"
         docker_bin_dir.mkdir()
@@ -229,26 +406,39 @@ class ModelCtlTests(unittest.TestCase):
             )
             docker_path.chmod(0o755)
 
-        payload = {
-            "choices": [
-                {
-                    "finish_reason": "tool_calls",
-                    "message": {
-                        "role": "assistant",
-                        "tool_calls": [
-                            {
-                                "id": "call_1",
-                                "type": "function",
-                                "function": {
-                                    "name": "report_ready",
-                                    "arguments": json.dumps({"status": "ok"}),
-                                },
-                            }
-                        ],
-                    },
-                }
-            ]
-        }
+        payload = [
+            {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "report_ready",
+                                        "arguments": json.dumps({"status": "ok"}),
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "Readiness confirmed.",
+                        },
+                    }
+                ]
+            },
+        ]
         _, _, port = self.start_probe_server(payload, docker_log_path=docker_log_path)
         self.write_env(port)
 
@@ -278,7 +468,7 @@ class ModelCtlTests(unittest.TestCase):
         self.assertIn("ollama pull milkey/deepseek-v2.5-1210:IQ1_S", docker_commands[1])
         self.assertIn("Starting ollama service before pull", result.stdout)
         self.assertIn("Verified tool calling for 'milkey/deepseek-v2.5-1210:IQ1_S'", result.stdout)
-        self.assertEqual(len(_ProbeRequestHandler.requests), 1)
+        self.assertEqual(len(_ProbeRequestHandler.requests), 2)
         self.assertEqual(_ProbeRequestHandler.requests[0]["docker_log_lines"], 2)
 
 

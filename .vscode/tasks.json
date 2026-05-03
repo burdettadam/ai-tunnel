@@ -27,18 +27,6 @@
       "osx": {
         "command": "python3",
         "args": [
-        {
-          "label": "Stack: Smoke Test Tool Calling",
-          "type": "shell",
-          "command": "py",
-          "args": [
-            "-3",
-            "scripts/check_tool_calling.py",
-            "--env-file",
-            ".env"
-          ],
-          "problemMatcher": []
-        },
           "scripts/check-accel.py",
           "--env-file",
           ".env",
@@ -167,6 +155,112 @@
       "problemMatcher": []
     },
     {
+      "label": "Models: Pull Proof Model (qwen2.5:3b)",
+      "type": "shell",
+      "command": "docker compose --env-file .env exec ollama ollama pull qwen2.5:3b",
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull Local Smoke Model (qwen2.5:0.5b)",
+      "type": "shell",
+      "command": "docker compose --env-file .env --profile init run --rm ollama-pull-local-smoke",
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Register Local Smoke Model (qwen2.5:0.5b)",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "qwen2.5:0.5b",
+          "--display-name",
+          "Qwen 2.5 0.5B (Local Smoke)",
+          "--max-input-tokens",
+          "32768",
+          "--max-output-tokens",
+          "2048",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--set-default",
+          "false",
+          "--pull",
+          "false"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "add",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "qwen2.5:0.5b",
+          "--display-name",
+          "Qwen 2.5 0.5B (Local Smoke)",
+          "--max-input-tokens",
+          "32768",
+          "--max-output-tokens",
+          "2048",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "true",
+          "--streaming",
+          "true",
+          "--set-default",
+          "false",
+          "--pull",
+          "false"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "add",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "qwen2.5:0.5b",
+        "--display-name",
+        "Qwen 2.5 0.5B (Local Smoke)",
+        "--max-input-tokens",
+        "32768",
+        "--max-output-tokens",
+        "2048",
+        "--tool-calling",
+        "false",
+        "--thinking",
+        "true",
+        "--streaming",
+        "true",
+        "--set-default",
+        "false",
+        "--pull",
+        "false"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Stack: Start Tunnel",
       "type": "shell",
       "command": "docker compose --env-file .env --profile tunnel up -d cloudflared",
@@ -179,6 +273,116 @@
       "windows": {
         "command": ".\\scripts\\smoke-test.ps1"
       },
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Smoke Test Tool Calling",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check_tool_calling.py",
+        "--env-file",
+        ".env"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Smoke Test Proof Model (qwen2.5:3b)",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env",
+          "--model-id",
+          "qwen2.5:3b"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--env-file",
+          ".env",
+          "--model-id",
+          "qwen2.5:3b"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check_tool_calling.py",
+        "--env-file",
+        ".env",
+        "--model-id",
+        "qwen2.5:3b"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Smoke Test Local Smoke Model (qwen2.5:0.5b)",
+      "type": "shell",
+      "command": "./scripts/smoke-test.sh",
+      "windows": {
+        "command": ".\\scripts\\smoke-test.ps1"
+      },
+      "args": [
+        "--chat",
+        "--model-id",
+        "qwen2.5:0.5b"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull + Register Local Smoke Model (qwen2.5:0.5b)",
+      "dependsOn": [
+        "Models: Pull Local Smoke Model (qwen2.5:0.5b)",
+        "Models: Register Local Smoke Model (qwen2.5:0.5b)",
+        "VS Code: Bootstrap User Space"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull + Smoke Test Local Smoke Model (qwen2.5:0.5b)",
+      "dependsOn": [
+        "Models: Pull Local Smoke Model (qwen2.5:0.5b)",
+        "Stack: Smoke Test Local Smoke Model (qwen2.5:0.5b)"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Models: Pull + Smoke Test Proof Model (qwen2.5:3b)",
+      "dependsOn": [
+        "Models: Pull Proof Model (qwen2.5:3b)",
+        "Stack: Smoke Test Proof Model (qwen2.5:3b)"
+      ],
+      "dependsOrder": "sequence",
       "problemMatcher": []
     },
     {
@@ -341,6 +545,38 @@
         "--copy-api-key"
       ],
       "problemMatcher": []
+    },
+    {
+      "label": "VS Code: Reset Copilot BYOK Migration",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/reset-byok-migration.py",
+          "--channel",
+          "insiders"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/reset-byok-migration.py",
+          "--channel",
+          "insiders"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/reset-byok-migration.py",
+        "--channel",
+        "insiders"
+      ],
+      "problemMatcher": [],
+      "detail": "Clear Copilot Chat's CustomOAI BYOK migration flag so the next reload re-imports github.copilot.chat.customOAIModels. Close VS Code Insiders before running so the SQLite database is not locked."
     },
     {
       "label": "Workspace Memory: Bootstrap Bridge",
@@ -607,6 +843,255 @@
         "true",
         "--pull",
         "${input:pullModel}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Remote DeepSeek: Configure Chat Model",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "remote-deepseek",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:remoteChatModelId}",
+          "--display-name",
+          "${input:remoteChatDisplayName}",
+          "--api-base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--max-input-tokens",
+          "${input:remoteMaxInputTokens}",
+          "--max-output-tokens",
+          "${input:remoteMaxOutputTokens}",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--set-default",
+          "true"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "remote-deepseek",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:remoteChatModelId}",
+          "--display-name",
+          "${input:remoteChatDisplayName}",
+          "--api-base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--max-input-tokens",
+          "${input:remoteMaxInputTokens}",
+          "--max-output-tokens",
+          "${input:remoteMaxOutputTokens}",
+          "--tool-calling",
+          "false",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--set-default",
+          "true"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "remote-deepseek",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "${input:remoteChatModelId}",
+        "--display-name",
+        "${input:remoteChatDisplayName}",
+        "--api-base-url",
+        "${input:deepseekApiBaseUrl}",
+        "--api-token-file",
+        "${input:deepseekApiTokenFile}",
+        "--max-input-tokens",
+        "${input:remoteMaxInputTokens}",
+        "--max-output-tokens",
+        "${input:remoteMaxOutputTokens}",
+        "--tool-calling",
+        "false",
+        "--thinking",
+        "${input:thinking}",
+        "--streaming",
+        "${input:streaming}",
+        "--set-default",
+        "true"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Remote DeepSeek: Configure Agent Model",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "remote-deepseek",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:remoteAgentModelId}",
+          "--display-name",
+          "${input:remoteAgentDisplayName}",
+          "--api-base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--max-input-tokens",
+          "${input:remoteMaxInputTokens}",
+          "--max-output-tokens",
+          "${input:remoteMaxOutputTokens}",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/modelctl.py",
+          "remote-deepseek",
+          "--env-file",
+          ".env",
+          "--settings-file",
+          ".vscode/settings.json",
+          "--model-id",
+          "${input:remoteAgentModelId}",
+          "--display-name",
+          "${input:remoteAgentDisplayName}",
+          "--api-base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--max-input-tokens",
+          "${input:remoteMaxInputTokens}",
+          "--max-output-tokens",
+          "${input:remoteMaxOutputTokens}",
+          "--tool-calling",
+          "true",
+          "--thinking",
+          "${input:thinking}",
+          "--streaming",
+          "${input:streaming}",
+          "--env-slot",
+          "agent",
+          "--set-default",
+          "true"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/modelctl.py",
+        "remote-deepseek",
+        "--env-file",
+        ".env",
+        "--settings-file",
+        ".vscode/settings.json",
+        "--model-id",
+        "${input:remoteAgentModelId}",
+        "--display-name",
+        "${input:remoteAgentDisplayName}",
+        "--api-base-url",
+        "${input:deepseekApiBaseUrl}",
+        "--api-token-file",
+        "${input:deepseekApiTokenFile}",
+        "--max-input-tokens",
+        "${input:remoteMaxInputTokens}",
+        "--max-output-tokens",
+        "${input:remoteMaxOutputTokens}",
+        "--tool-calling",
+        "true",
+        "--thinking",
+        "${input:thinking}",
+        "--streaming",
+        "${input:streaming}",
+        "--env-slot",
+        "agent",
+        "--set-default",
+        "true"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Remote DeepSeek: Probe Agent Loop",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--model-id",
+          "${input:remoteAgentModelId}"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/check_tool_calling.py",
+          "--base-url",
+          "${input:deepseekApiBaseUrl}",
+          "--api-token-file",
+          "${input:deepseekApiTokenFile}",
+          "--model-id",
+          "${input:remoteAgentModelId}"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/check_tool_calling.py",
+        "--base-url",
+        "${input:deepseekApiBaseUrl}",
+        "--api-token-file",
+        "${input:deepseekApiTokenFile}",
+        "--model-id",
+        "${input:remoteAgentModelId}"
       ],
       "problemMatcher": []
     },
@@ -917,6 +1402,54 @@
       "type": "promptString",
       "description": "Tool-capable display name for agent mode",
       "default": "DeepSeek Math V2 Large (IQ1_S)"
+    },
+    {
+      "id": "remoteChatModelId",
+      "type": "promptString",
+      "description": "Remote DeepSeek chat model id",
+      "default": "deepseek-v4-flash"
+    },
+    {
+      "id": "remoteChatDisplayName",
+      "type": "promptString",
+      "description": "Remote DeepSeek chat display name",
+      "default": "DeepSeek V4 Flash"
+    },
+    {
+      "id": "remoteAgentModelId",
+      "type": "promptString",
+      "description": "Remote DeepSeek agent model id",
+      "default": "deepseek-v4-pro"
+    },
+    {
+      "id": "remoteAgentDisplayName",
+      "type": "promptString",
+      "description": "Remote DeepSeek agent display name",
+      "default": "DeepSeek V4 Pro"
+    },
+    {
+      "id": "deepseekApiBaseUrl",
+      "type": "promptString",
+      "description": "Remote DeepSeek API base URL",
+      "default": "https://api.deepseek.com"
+    },
+    {
+      "id": "deepseekApiTokenFile",
+      "type": "promptString",
+      "description": "Path to the DeepSeek API token file",
+      "default": "../ai-tunnel-secrets/deepseek-api-token"
+    },
+    {
+      "id": "remoteMaxInputTokens",
+      "type": "promptString",
+      "description": "Maximum input tokens for remote DeepSeek models",
+      "default": "1000000"
+    },
+    {
+      "id": "remoteMaxOutputTokens",
+      "type": "promptString",
+      "description": "Maximum output tokens for remote DeepSeek models",
+      "default": "8192"
     },
     {
       "id": "maxInputTokens",

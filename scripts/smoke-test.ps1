@@ -1,12 +1,71 @@
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
 param(
     [string]$EnvFile = '.env',
     [switch]$Chat,
     [switch]$ToolCalling,
-    [string]$ModelId
+    [string]$ModelId,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$CliArgs
 )
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$pendingArgs = @()
+if ($EnvFile.StartsWith('--')) {
+    $pendingArgs += $EnvFile
+    $EnvFile = '.env'
+}
+
+if ($ModelId) {
+    if ($ModelId.StartsWith('--') -or $pendingArgs.Count -gt 0) {
+        $pendingArgs += $ModelId
+        $ModelId = ''
+    }
+}
+
+if ($CliArgs) {
+    $pendingArgs += @($CliArgs | Where-Object { $_ })
+}
+
+if ($pendingArgs.Count -gt 0) {
+    $index = 0
+    while ($index -lt $pendingArgs.Count) {
+        $arg = $pendingArgs[$index]
+        switch ($arg) {
+            '--env-file' {
+                if ($index + 1 -ge $pendingArgs.Count) {
+                    throw 'Missing value for --env-file'
+                }
+
+                $EnvFile = $pendingArgs[$index + 1]
+                $index += 2
+                continue
+            }
+            '--chat' {
+                $Chat = $true
+                $index += 1
+                continue
+            }
+            '--tool-calling' {
+                $ToolCalling = $true
+                $index += 1
+                continue
+            }
+            '--model-id' {
+                if ($index + 1 -ge $pendingArgs.Count) {
+                    throw 'Missing value for --model-id'
+                }
+
+                $ModelId = $pendingArgs[$index + 1]
+                $index += 2
+                continue
+            }
+            default {
+                throw "Unknown argument: $arg"
+            }
+        }
+    }
+}
 
 $scriptRoot = Split-Path -Parent $PSCommandPath
 
@@ -31,12 +90,16 @@ Get-Content -Path $EnvFile | ForEach-Object {
 
 foreach ($key in @('NGINX_LISTEN_PORT', 'OLLAMA_API_HOSTNAME', 'NGINX_API_TOKEN_FILE', 'OLLAMA_MODEL')) {
     if (-not $values.ContainsKey($key)) {
-        throw "Missing required key in $EnvFile: $key"
+        throw "Missing required key in ${EnvFile}: $key"
     }
 }
 
 $token = (Get-Content -Path $values['NGINX_API_TOKEN_FILE'] -Raw).Trim()
 $baseUrl = "http://127.0.0.1:$($values['NGINX_LISTEN_PORT'])"
+$chatModelId = $ModelId
+if (-not $chatModelId) {
+    $chatModelId = $values['OLLAMA_MODEL']
+}
 $headers = @{
     Host = $values['OLLAMA_API_HOSTNAME']
     Authorization = "Bearer $token"
@@ -48,19 +111,32 @@ Invoke-RestMethod -Method Get -Uri "$baseUrl/v1/models" -Headers $headers | Conv
 if ($Chat) {
     Write-Output 'Checking streaming /v1/chat/completions through Nginx'
     $body = @{ 
-        model = $values['OLLAMA_MODEL']
+        model = $chatModelId
         stream = $true
         messages = @(
             @{ role = 'user'; content = 'Reply with ok.' }
         )
     } | ConvertTo-Json -Depth 10 -Compress
 
-    & curl.exe -fsS -N `
-        -H "Host: $($values['OLLAMA_API_HOSTNAME'])" `
-        -H "Authorization: Bearer $token" `
-        -H 'Content-Type: application/json' `
-        -d $body `
-        "$baseUrl/v1/chat/completions"
+    $bodyPath = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($bodyPath, $body, (New-Object System.Text.UTF8Encoding $false))
+
+        & curl.exe -fsS -N `
+            -H "Host: $($values['OLLAMA_API_HOSTNAME'])" `
+            -H "Authorization: Bearer $token" `
+            -H 'Content-Type: application/json' `
+            --data-binary "@$bodyPath" `
+            "$baseUrl/v1/chat/completions"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Streaming chat smoke test failed with curl exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        if (Test-Path -Path $bodyPath) {
+            Remove-Item -Path $bodyPath -Force
+        }
+    }
 }
 
 if ($ToolCalling) {
