@@ -33,18 +33,16 @@ def require_linux_host(provider: str) -> None:
 
 def build_command(provider: str, env_values: dict[str, str]) -> list[str]:
     if provider == "nvidia":
-        image = env_values.get("OLLAMA_IMAGE", "ollama/ollama:latest")
+        image = env_values.get("NVIDIA_CHECK_IMAGE", "nvidia/cuda:12.8.0-base-ubuntu22.04")
         return [
             "docker",
             "run",
             "--rm",
             "--gpus",
             "all",
-            "--entrypoint",
-            "/bin/sh",
             image,
-            "-lc",
-            "test -c /dev/nvidiactl || test -c /dev/nvidia0",
+            "nvidia-smi",
+            "-L",
         ]
 
     if provider == "amd":

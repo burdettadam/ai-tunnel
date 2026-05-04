@@ -463,46 +463,36 @@ def build_model_entries(values: dict[str, str]) -> tuple[list[tuple[str, dict[st
     model_entries: list[tuple[str, dict[str, Any]]] = []
     api_public_url = resolve_api_public_url(values)
 
-    default_model_key = "DEEPSEEK_CHAT_MODEL" if values.get("DEEPSEEK_CHAT_MODEL", "").strip() else "OLLAMA_MODEL"
-    default_model_id_key = "DEEPSEEK_CHAT_MODEL_VSCODE_ID" if default_model_key == "DEEPSEEK_CHAT_MODEL" else "OLLAMA_MODEL_VSCODE_ID"
-    default_display_name_key = "DEEPSEEK_CHAT_MODEL_DISPLAY_NAME" if default_model_key == "DEEPSEEK_CHAT_MODEL" else "OLLAMA_MODEL_DISPLAY_NAME"
-    default_context_keys = ["DEEPSEEK_CHAT_CONTEXT_LENGTH", "OLLAMA_CONTEXT_LENGTH"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_CONTEXT_LENGTH"]
-    default_max_output_keys = ["DEEPSEEK_CHAT_MAX_OUTPUT_TOKENS", "OLLAMA_MAX_OUTPUT_TOKENS"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_MAX_OUTPUT_TOKENS"]
-    default_tool_keys = ["DEEPSEEK_CHAT_MODEL_TOOL_CALLING"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_MODEL_TOOL_CALLING"]
-    default_vision_keys = ["DEEPSEEK_CHAT_MODEL_VISION", "OLLAMA_MODEL_VISION"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_MODEL_VISION"]
-    default_thinking_keys = ["DEEPSEEK_CHAT_MODEL_THINKING", "OLLAMA_MODEL_THINKING"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_MODEL_THINKING"]
-    default_streaming_keys = ["DEEPSEEK_CHAT_MODEL_STREAMING", "OLLAMA_MODEL_STREAMING"] if default_model_key == "DEEPSEEK_CHAT_MODEL" else ["OLLAMA_MODEL_STREAMING"]
-
     default_model_id, default_model_entry, api_public_url = build_model_entry(
         values,
         api_public_url=api_public_url,
-        model_key=default_model_key,
-        model_id_key=default_model_id_key,
-        display_name_key=default_display_name_key,
-        context_length_keys=default_context_keys,
-        max_output_tokens_keys=default_max_output_keys,
-        tool_calling_keys=default_tool_keys,
-        vision_keys=default_vision_keys,
-        thinking_keys=default_thinking_keys,
-        streaming_keys=default_streaming_keys,
+        model_key="OLLAMA_MODEL",
+        model_id_key="OLLAMA_MODEL_VSCODE_ID",
+        display_name_key="OLLAMA_MODEL_DISPLAY_NAME",
+        context_length_keys=["OLLAMA_CONTEXT_LENGTH"],
+        max_output_tokens_keys=["OLLAMA_MAX_OUTPUT_TOKENS"],
+        tool_calling_keys=["OLLAMA_MODEL_TOOL_CALLING"],
+        vision_keys=["OLLAMA_MODEL_VISION"],
+        thinking_keys=["OLLAMA_MODEL_THINKING"],
+        streaming_keys=["OLLAMA_MODEL_STREAMING"],
     )
     model_entries.append((default_model_id, default_model_entry))
 
-    agent_model_key = "DEEPSEEK_AGENT_MODEL" if values.get("DEEPSEEK_AGENT_MODEL", "").strip() else "OLLAMA_AGENT_MODEL"
-    agent_model_id = first_non_empty(values, [f"{agent_model_key}_VSCODE_ID", agent_model_key])
+    agent_model_key = "OLLAMA_AGENT_MODEL"
+    agent_model_id = first_non_empty(values, ["OLLAMA_AGENT_MODEL_VSCODE_ID", "OLLAMA_AGENT_MODEL"])
     if agent_model_id:
         agent_model_id, agent_model_entry, _ = build_model_entry(
             values,
             api_public_url=api_public_url,
             model_key=agent_model_key,
-            model_id_key=f"{agent_model_key}_VSCODE_ID",
-            display_name_key=f"{agent_model_key}_DISPLAY_NAME",
-            context_length_keys=[f"{agent_model_key.replace('MODEL', 'CONTEXT_LENGTH')}", "OLLAMA_AGENT_CONTEXT_LENGTH", "OLLAMA_CONTEXT_LENGTH"],
-            max_output_tokens_keys=[f"{agent_model_key.replace('MODEL', 'MAX_OUTPUT_TOKENS')}", "OLLAMA_AGENT_MAX_OUTPUT_TOKENS", "OLLAMA_MAX_OUTPUT_TOKENS"],
-            tool_calling_keys=[f"{agent_model_key}_TOOL_CALLING", "OLLAMA_AGENT_MODEL_TOOL_CALLING"],
-            vision_keys=[f"{agent_model_key}_VISION", "OLLAMA_AGENT_MODEL_VISION", "OLLAMA_MODEL_VISION"],
-            thinking_keys=[f"{agent_model_key}_THINKING", "OLLAMA_AGENT_MODEL_THINKING", "OLLAMA_MODEL_THINKING"],
-            streaming_keys=[f"{agent_model_key}_STREAMING", "OLLAMA_AGENT_MODEL_STREAMING", "OLLAMA_MODEL_STREAMING"],
+            model_id_key="OLLAMA_AGENT_MODEL_VSCODE_ID",
+            display_name_key="OLLAMA_AGENT_MODEL_DISPLAY_NAME",
+            context_length_keys=["OLLAMA_AGENT_CONTEXT_LENGTH", "OLLAMA_CONTEXT_LENGTH"],
+            max_output_tokens_keys=["OLLAMA_AGENT_MAX_OUTPUT_TOKENS", "OLLAMA_MAX_OUTPUT_TOKENS"],
+            tool_calling_keys=["OLLAMA_AGENT_MODEL_TOOL_CALLING"],
+            vision_keys=["OLLAMA_AGENT_MODEL_VISION", "OLLAMA_MODEL_VISION"],
+            thinking_keys=["OLLAMA_AGENT_MODEL_THINKING", "OLLAMA_MODEL_THINKING"],
+            streaming_keys=["OLLAMA_AGENT_MODEL_STREAMING", "OLLAMA_MODEL_STREAMING"],
         )
         model_entries.append((agent_model_id, agent_model_entry))
 

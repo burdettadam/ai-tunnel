@@ -199,79 +199,63 @@ class ModelCtlTests(unittest.TestCase):
         second_messages = _ProbeRequestHandler.requests[1]["body"]["messages"]
         self.assertEqual(second_messages[-1], {"role": "tool", "tool_call_id": "call_1", "content": json.dumps({"status": "ok"})})
 
-    def test_remote_deepseek_registration_updates_backend_config_and_settings(self) -> None:
-        payload = [
-            {
-                "choices": [
-                    {
-                        "finish_reason": "tool_calls",
-                        "message": {
-                            "role": "assistant",
-                            "tool_calls": [
-                                {
-                                    "id": "call_1",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "report_ready",
-                                        "arguments": json.dumps({"status": "ok"}),
-                                    },
-                                }
-                            ],
-                        },
-                    }
-                ]
-            },
-            {
-                "choices": [
-                    {
-                        "finish_reason": "stop",
-                        "message": {
-                            "role": "assistant",
-                            "content": "Ready.",
-                        },
-                    }
-                ]
-            },
-        ]
-        _, _, port = self.start_probe_server(payload)
+    def test_catalog_registration_keeps_existing_defaults(self) -> None:
+        _, _, port = self.start_probe_server({"choices": []})
         self.write_env(port)
+
+        result = self.run_modelctl(
+            "--model-id",
+            "gemma4:e4b",
+            "--display-name",
+            "Gemma 4 E4B (Edge)",
+            "--max-input-tokens",
+            "131072",
+            "--max-output-tokens",
+            "8192",
+            "--tool-calling",
+            "false",
+            "--set-default",
+            "false",
+            "--pull",
+            "false",
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        entry = settings["github.copilot.chat.customOAIModels"]["gemma4:e4b"]
+        self.assertEqual(entry["name"], "Gemma 4 E4B (Edge)")
+        self.assertEqual(entry["url"], "https://ollama-api.example.com/v1")
+        self.assertEqual(entry["maxInputTokens"], 131072)
+        self.assertEqual(entry["maxOutputTokens"], 8192)
+        self.assertFalse(entry["toolCalling"])
+        env_text = self.env_path.read_text(encoding="utf-8")
+        self.assertIn("OLLAMA_MODEL=deepseek-v2:16b-lite-chat-q4_K_M", env_text)
+        self.assertNotIn("OLLAMA_MODEL=gemma4:e4b", env_text)
+        self.assertEqual(len(_ProbeRequestHandler.requests), 0)
+
+    def test_cloud_backed_model_ids_are_rejected(self) -> None:
+        self.write_env(11436)
 
         result = self.run_modelctl(
             "--model-id",
             "deepseek-v4-pro",
             "--display-name",
             "DeepSeek V4 Pro",
-            "--api-base-url",
-            f"http://127.0.0.1:{port}",
-            "--api-token",
-            "example-upstream-token",
             "--tool-calling",
             "true",
+            "--env-slot",
+            "agent",
             "--set-default",
             "true",
-            subcommand="remote-deepseek",
+            "--pull",
+            "false",
         )
 
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertIn("Verified tool calling for 'deepseek-v4-pro'", result.stdout)
-        self.assertIn("Configured remote DeepSeek backend", result.stdout)
-        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
-        entry = settings["github.copilot.chat.customOAIModels"]["deepseek-v4-pro"]
-        self.assertEqual(entry["name"], "DeepSeek V4 Pro")
-        self.assertEqual(entry["url"], "https://ollama-api.example.com/v1")
-        self.assertTrue(entry["toolCalling"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Cloud-backed Ollama model ids are not supported in this repo", result.stderr)
+        self.assertFalse(self.settings_path.exists())
         env_text = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("DEEPSEEK_ADAPTER_ENABLED=true", env_text)
-        self.assertIn(f"DEEPSEEK_BACKEND_BASE_URL=http://127.0.0.1:{port}", env_text)
-        self.assertIn("DEEPSEEK_CHAT_MODEL=deepseek-v4-pro", env_text)
-        self.assertIn("DEEPSEEK_CHAT_MODEL_DISPLAY_NAME=DeepSeek V4 Pro", env_text)
-        self.assertIn("DEEPSEEK_CHAT_MODEL_VSCODE_ID=deepseek-v4-pro", env_text)
-        self.assertIn("DEEPSEEK_CHAT_CONTEXT_LENGTH=32768", env_text)
-        self.assertIn("DEEPSEEK_CHAT_MAX_OUTPUT_TOKENS=8192", env_text)
-        self.assertIn("DEEPSEEK_MODEL_MAP_JSON={\"deepseek-v4-pro\":\"deepseek-v4-pro\"}", env_text)
-        self.assertEqual(len(_ProbeRequestHandler.requests), 2)
-        self.assertEqual(_ProbeRequestHandler.requests[0]["path"], "/chat/completions")
-        self.assertEqual(_ProbeRequestHandler.requests[0]["authorization"], "Bearer example-upstream-token")
+        self.assertNotIn("OLLAMA_AGENT_MODEL=deepseek-v4-pro", env_text)
 
     def test_tool_probe_failure_blocks_tool_capable_registration(self) -> None:
         payload = {

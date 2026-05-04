@@ -20,6 +20,46 @@
       "thinking": true,
       "streaming": true
     },
+    "gemma4:e2b": {
+      "name": "Gemma 4 E2B (Edge)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
+    },
+    "gemma4:e4b": {
+      "name": "Gemma 4 E4B (Edge)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
+    },
+    "gemma4:26b": {
+      "name": "Gemma 4 26B (Workstation MoE)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 262144,
+      "maxOutputTokens": 8192,
+        "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
+    },
+    "gemma4:31b": {
+      "name": "Gemma 4 31B (Workstation Dense)",
+      "url": "https://ollama-api.korwynne.com/v1",
+      "maxInputTokens": 262144,
+      "maxOutputTokens": 8192,
+        "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
+    },
     "qwen2.5:3b": {
       "name": "Qwen 2.5 3B (Chat + Agent)",
       "url": "https://ollama-api.korwynne.com/v1",

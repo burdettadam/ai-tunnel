@@ -17,35 +17,31 @@ services:
       retries: 10
       start_period: 30s
 
-  deepseek-adapter:
+  model-router:
     image: python:3.12-alpine
     restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
     environment:
-      DEEPSEEK_ADAPTER_ENABLED: ${DEEPSEEK_ADAPTER_ENABLED}
-      DEEPSEEK_ADAPTER_PORT: ${DEEPSEEK_ADAPTER_PORT}
-      DEEPSEEK_BACKEND_BASE_URL: ${DEEPSEEK_BACKEND_BASE_URL}
-      DEEPSEEK_CHAT_MODEL: ${DEEPSEEK_CHAT_MODEL}
-      DEEPSEEK_MODEL_MAP_JSON: ${DEEPSEEK_MODEL_MAP_JSON}
+      MODEL_ROUTER_PORT: ${MODEL_ROUTER_PORT:-11436}
+      OLLAMA_PORT: ${OLLAMA_PORT}
+      MODEL_ROUTER_TIMEOUT_SECS: ${MODEL_ROUTER_TIMEOUT_SECS:-300}
+      MODEL_ROUTER_CACHE_TTL_SECS: ${MODEL_ROUTER_CACHE_TTL_SECS:-30}
     command:
       - /bin/sh
       - -c
       - |
-        if [ "${DEEPSEEK_ADAPTER_ENABLED:-false}" = "true" ]; then
-          exec python /opt/adapter/deepseek_adapter.py \
-            --bind-host 0.0.0.0 \
-            --port "${DEEPSEEK_ADAPTER_PORT}" \
-            --base-url "${DEEPSEEK_BACKEND_BASE_URL}" \
-            --api-token-file /run/secrets-host/deepseek-api-token \
-            --default-model "${DEEPSEEK_CHAT_MODEL}" \
-            --model-map-json "${DEEPSEEK_MODEL_MAP_JSON}"
-        fi
-
-        exec python -m http.server "${DEEPSEEK_ADAPTER_PORT}" --bind 0.0.0.0 --directory /tmp
+        exec python /opt/router/model_router.py \
+          --bind-host 0.0.0.0 \
+          --port "${MODEL_ROUTER_PORT:-11436}" \
+          --ollama-base-url "http://ollama:${OLLAMA_PORT}" \
+          --timeout "${MODEL_ROUTER_TIMEOUT_SECS:-300}" \
+          --model-cache-ttl-secs "${MODEL_ROUTER_CACHE_TTL_SECS:-30}"
     expose:
-      - "${DEEPSEEK_ADAPTER_PORT}"
+      - "${MODEL_ROUTER_PORT:-11436}"
     volumes:
-      - ./scripts/deepseek_adapter.py:/opt/adapter/deepseek_adapter.py:ro
-      - ${SECRETS_DIR}:/run/secrets-host:ro
+      - ./scripts/model_router.py:/opt/router/model_router.py:ro
     networks:
       - internal
 
@@ -85,15 +81,14 @@ services:
     image: ${NGINX_IMAGE}
     restart: unless-stopped
     depends_on:
-      deepseek-adapter:
+      model-router:
         condition: service_started
       ollama:
         condition: service_healthy
     environment:
       NGINX_LISTEN_PORT: ${NGINX_LISTEN_PORT}
+      MODEL_ROUTER_PORT: ${MODEL_ROUTER_PORT:-11436}
       OLLAMA_PORT: ${OLLAMA_PORT}
-      DEEPSEEK_ADAPTER_ENABLED: ${DEEPSEEK_ADAPTER_ENABLED}
-      DEEPSEEK_ADAPTER_PORT: ${DEEPSEEK_ADAPTER_PORT}
       OLLAMA_API_HOSTNAME: ${OLLAMA_API_HOSTNAME}
       OLLAMA_ADMIN_HOSTNAME: ${OLLAMA_ADMIN_HOSTNAME}
       ENABLE_ADMIN_BASIC_AUTH: ${ENABLE_ADMIN_BASIC_AUTH}
@@ -118,7 +113,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:${NGINX_LISTEN_PORT}/healthz >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - --header='Host: ${OLLAMA_API_HOSTNAME}' http://127.0.0.1:${NGINX_LISTEN_PORT}/healthz >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

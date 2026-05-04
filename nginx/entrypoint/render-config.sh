@@ -67,10 +67,7 @@ proxy_send_timeout ${NGINX_PROXY_SEND_TIMEOUT}s;
 proxy_connect_timeout 30s;
 EOF
 
-openai_proxy_pass_target="http://ollama_upstream"
-if is_true "${DEEPSEEK_ADAPTER_ENABLED:-false}"; then
-    openai_proxy_pass_target="http://deepseek-adapter:${DEEPSEEK_ADAPTER_PORT}"
-fi
+openai_proxy_pass_target="http://model-router:${MODEL_ROUTER_PORT:-11436}"
 
 if is_true "${ENABLE_OPENAI_COMPAT_API:-true}"; then
     cat > "$include_dir/openai-api-location.inc" <<EOF

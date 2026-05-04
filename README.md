@@ -1,21 +1,23 @@
 # AI Tunnel Example Repo
 
-This repo provides a working example scaffold for exposing an Ollama server through Cloudflare Tunnel, fronting it with Nginx, and consuming it from VS Code Insiders through GitHub Copilot's OpenAI-compatible bring-your-own-model path.
+This repo provides a working example scaffold for exposing a self-hosted Ollama stack through Cloudflare Tunnel, fronting it with Nginx and a local model-router, and consuming it from VS Code Insiders through GitHub Copilot's OpenAI-compatible bring-your-own-model path. The shared workspace catalog is set up for a small team running multiple local model families, including DeepSeek and Gemma 4 weight profiles.
 
 ## What This Stack Does
 
 - runs Ollama privately on the internal Docker network
-- fronts Ollama with Nginx
+- routes OpenAI-compatible requests through a local model-router to locally pulled Ollama models
+- fronts the router with Nginx
 - protects the machine API route with bearer-token auth loaded from file
 - optionally protects the admin hostname with Nginx Basic Auth loaded from file
 - publishes the Nginx service through Cloudflare Tunnel
+- ships a shared VS Code model catalog with local DeepSeek, Gemma 4, and proof or smoke profiles
 - keeps configuration in `.env`, using [example.env](example.env) as the contract
 
 ## Architecture
 
 Traffic flow:
 
-`Cloudflare -> cloudflared -> nginx -> ollama`
+`Cloudflare -> cloudflared -> nginx -> model-router -> ollama`
 
 The API and admin surfaces are intentionally split:
 
@@ -41,6 +43,7 @@ flowchart LR
         edge[Cloudflare Edge]
         tunnel[cloudflared]
         proxy[nginx]
+        router[model-router]
         model[Ollama]
     end
 
@@ -49,7 +52,8 @@ flowchart LR
     customModel --> edge
     edge --> tunnel
     tunnel --> proxy
-    proxy --> model
+    proxy --> router
+    router --> model
     copilot --> mcp
     mcp --> copilot
     copilot -.-> platform
@@ -57,11 +61,11 @@ flowchart LR
 
 Operational split:
 
-- model inference goes through `Cloudflare -> cloudflared -> nginx -> ollama`
+- model inference goes through `Cloudflare -> cloudflared -> nginx -> model-router -> ollama`
 - MCP tool calls are separate from the Ollama inference path and stay attached to Copilot in VS Code
 - Copilot platform features like sign-in, policy, indexing, and side requests still exist alongside the custom model path
 
-## Default Model
+## Default Model And Shared Catalog
 
 The default model profile for this repo is `DeepSeek V2 Lite`.
 
@@ -76,6 +80,15 @@ Important distinction:
 - the model id sent over the OpenAI-compatible API must match the Ollama model id unless you add a translation layer
 
 This repo does not add a model-id translation proxy, so VS Code configuration should use `deepseek-v2:16b-lite-chat-q4_K_M` as the model id.
+
+The shared workspace catalog in [.vscode/settings.json](.vscode/settings.json) now also includes these local Gemma 4 weight profiles as separate model entries:
+
+- `gemma4:e2b`
+- `gemma4:e4b`
+- `gemma4:26b`
+- `gemma4:31b`
+
+This repo pins `gemma4:e4b` as the convenience Gemma profile for pull, register, smoke-test, and optional tool-probe tasks. The larger Gemma 4 variants stay selectable through the shared catalog and can be pulled on machines that fit them.
 
 ## Repo Layout
 
@@ -113,7 +126,6 @@ Create a sibling `ai-tunnel-secrets` directory one level up from the repo:
 ```text
 ../ai-tunnel-secrets/
 |-- cloudflared-token
-|-- deepseek-api-token
 |-- nginx-admin-password
 |-- ollama-api-token
 `-- nginx-htpasswd
@@ -122,7 +134,6 @@ Create a sibling `ai-tunnel-secrets` directory one level up from the repo:
 Secret usage:
 
 - `cloudflared-token` is mounted into the `cloudflared` container and used as the tunnel token file
-- `deepseek-api-token` is mounted into the optional DeepSeek adapter when you enable the remote hosted DeepSeek path
 - `nginx-admin-password` is the plaintext source of truth for admin Basic Auth
 - `ollama-api-token` is read by Nginx and enforced on the API hostname
 - `nginx-htpasswd` is the derived hash file used only when `ENABLE_ADMIN_BASIC_AUTH=true`
@@ -135,14 +146,16 @@ Fast path for a fresh clone:
 2. Run the secrets bootstrap so the sibling `../ai-tunnel-secrets` directory and local token files exist.
 3. Start the stack and pull the default lite chat model.
 4. Bootstrap VS Code user settings so Copilot sees the `AI Tunnel` provider.
-5. On a machine that can host the larger package, configure the prewired `DeepSeek Math V2 Large (IQ1_S)` agent profile.
-6. Run the smoke tests.
+5. If you want Gemma locally as well, pull or register the pinned `gemma4:e4b` profile, or add another Gemma 4 weight profile through the generic model tasks.
+6. On a machine that can host the larger package, configure the prewired `DeepSeek Math V2 Large (IQ1_S)` agent profile.
+7. Run the smoke tests.
 
 Known small proof model:
 
 - `qwen2.5:0.5b` is now wired in as a tiny local smoke model for quick chat-only stack checks when you want a fast local deployment before pulling anything larger
 - `qwen2.5:3b` is the smallest model currently verified in this repo to prove the full Nginx-backed OpenAI-compatible path end to end, including `scripts/check_tool_calling.py`
 - use it when you want to prove the stack before downloading the larger DeepSeek Math package
+- `gemma4:e4b` is the pinned Gemma 4 convenience profile for this repo; treat the other Gemma 4 tags as separate weight-profile entries instead of aliases for the same model
 
 Windows PowerShell:
 
@@ -151,6 +164,8 @@ Copy-Item example.env .env
 py -3 scripts/bootstrap-secrets.py --env-file .env
 docker compose --env-file .env up -d
 docker compose --env-file .env --profile init run --rm ollama-pull
+# Optional: pull the full local workspace catalog instead of only the default model.
+py -3 scripts/pull_all_models.py --env-file .env --settings-file .vscode/settings.json
 py -3 scripts/bootstrap-vscode-user.py --env-file .env --copy-api-key
 py -3 scripts/modelctl.py add \
     --env-file .env \
@@ -176,6 +191,8 @@ cp example.env .env
 python3 scripts/bootstrap-secrets.py --env-file .env
 docker compose --env-file .env up -d
 docker compose --env-file .env --profile init run --rm ollama-pull
+# Optional: pull the full local workspace catalog instead of only the default model.
+python3 scripts/pull_all_models.py --env-file .env --settings-file .vscode/settings.json
 python3 scripts/bootstrap-vscode-user.py --env-file .env --copy-api-key
 python3 scripts/modelctl.py add \
     --env-file .env \
@@ -199,19 +216,13 @@ Task-first alternative in VS Code:
 1. Run `Stack: Bootstrap Secrets`.
 2. Run `Stack: Start Local Services`.
 3. Run `Stack: Pull Default Model`.
-4. Run `VS Code: Bootstrap User Space + Copy API Key`.
-5. If you want a tiny local chat sanity check first, run `Models: Pull + Register Local Smoke Model (qwen2.5:0.5b)` and then `Stack: Smoke Test Local Smoke Model (qwen2.5:0.5b)`.
-6. If you want a small end-to-end tool-calling proof next, run `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)`.
-7. Run `Models: Configure DeepSeek Math V2 Large Agent` when you are ready to validate the larger agent profile.
-8. Run `Stack: Smoke Test` and `Stack: Smoke Test Tool Calling`.
-
-Remote DeepSeek path:
-
-- set `DEEPSEEK_ADAPTER_ENABLED=true` in `.env` when you want Copilot's `/v1` traffic to flow through the internal DeepSeek adapter instead of the local Ollama OpenAI pass-through
-- populate `../ai-tunnel-secrets/deepseek-api-token` with your upstream DeepSeek API key before starting the stack
-- run `Remote DeepSeek: Configure Chat Model` to register a remote chat model in `.env` and `.vscode/settings.json`
-- run `Remote DeepSeek: Configure Agent Model` to register the remote agent profile and verify a full tool round-trip directly against the upstream DeepSeek endpoint
-- run `Remote DeepSeek: Probe Agent Loop` if you want to re-check the upstream model without rewriting settings
+4. If you want the entire shared local catalog on disk, run `Stack: Pull All Local Models`.
+5. Run `VS Code: Bootstrap User Space + Copy API Key`.
+6. If you want a tiny local chat sanity check first, run `Models: Pull + Register Local Smoke Model (qwen2.5:0.5b)` and then `Stack: Smoke Test Local Smoke Model (qwen2.5:0.5b)`.
+7. If you want a small end-to-end tool-calling proof next, run `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)`.
+8. If you want the pinned Gemma path, run `Models: Pull + Register Gemma 4 E4B` and then `Models: Pull + Smoke Test Gemma 4 E4B`.
+9. Run `Models: Configure DeepSeek Math V2 Large Agent` when you are ready to validate the larger agent profile.
+10. Run `Stack: Smoke Test` and `Stack: Smoke Test Tool Calling`.
 
 Public repo hygiene:
 
@@ -440,7 +451,7 @@ If you want Copilot to use MCP tools alongside the tunneled Ollama model:
 Important separation:
 
 - MCP tool calls do not go through the Ollama tunnel path
-- model generation still goes through `Cloudflare -> cloudflared -> nginx -> ollama`
+- model generation still goes through `Cloudflare -> cloudflared -> nginx -> model-router -> ollama`
 - the memory bridge MCP endpoint is local to the workspace and is generated per clone because its localhost port is derived from the workspace path
 
 This repo now promotes `workspace-memory-bridge` as the default memory-oriented MCP integration. The bootstrap wrapper at [scripts/bootstrap-workspace-memory.py](scripts/bootstrap-workspace-memory.py) prefers a sibling checkout at `../workspace-memory-bridge` and falls back to the public package when needed.
@@ -469,17 +480,9 @@ Known-good proof path:
 
 - use `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)` if you want a smaller verified tool-calling model before testing the larger DeepSeek Math agent profile
 - that task pulls `qwen2.5:3b` into the Docker-backed Ollama store and runs the same `scripts/check_tool_calling.py` probe that the repo uses for OpenAI-compatible agent-loop validation
-
-If you need to validate a remote hosted endpoint directly instead of the local Nginx route, `scripts/check_tool_calling.py` also supports an explicit base URL:
-
-```powershell
-py -3 scripts/check_tool_calling.py \
-    --base-url https://your-remote-endpoint.example.com \
-    --api-token-file ..\ai-tunnel-secrets\ollama-api-token \
-    --model-id deepseek-v4-pro
-```
-
-Add `--host-header your-public-hostname.example.com` if the remote endpoint sits behind a reverse proxy that routes on `Host`.
+- use `Models: Pull + Smoke Test Gemma 4 E4B` if you want the pinned Gemma 4 chat or vision profile on a fresh machine
+- `gemma4:e4b` now passes the local tool-calling probe through the model-router compatibility shim and ships as the pinned Gemma agent-capable profile
+- use `Models: Probe Gemma 4 E4B Tool Calling` as a recheck on a new machine, and probe the other Gemma 4 tags before you mark them agent-capable
 
 ## Model Management Tooling
 
@@ -490,20 +493,28 @@ Use it when you want to add a new model in both places that matter here:
 - Ollama, by optionally pulling the model into the local model store
 - VS Code, by writing the matching `github.copilot.chat.customOAIModels` entry into [.vscode/settings.json](.vscode/settings.json)
 
+The shared workspace catalog now includes:
+
+- the default local DeepSeek chat profile
+- the larger DeepSeek Math agent profile
+- Gemma 4 weight profiles for `gemma4:e2b`, `gemma4:e4b`, `gemma4:26b`, and `gemma4:31b`
+- Qwen proof and local smoke profiles
+
 Recommended split for Copilot:
 
 - keep `DeepSeek V2 Lite` as the default chat profile with `toolCalling=false`
 - use the preconfigured `OLLAMA_AGENT_*` profile for `DeepSeek Math V2 Large (IQ1_S)` in agent mode with `toolCalling=true`
+- keep Gemma 4 weight profiles as separate catalog entries by actual Ollama tag instead of reusing one friendly alias for multiple weights
+- use `gemma4:e4b` as the pinned Gemma profile for this repo; `gemma4:e2b` is also now validated locally with `toolCalling=true`
+- `gemma4:26b` and `gemma4:31b` now both pass the local tool-calling probe on the current GPU-backed stack
+- use `Stack: Pull All Local Models` or `scripts/pull_all_models.py` if you want the full shared local catalog present on disk before validation
 - let `modelctl.py` pull first and then verify a full tool round-trip before it writes that agent-capable profile unless you explicitly pass `--skip-tool-verification true`
-
-Remote DeepSeek alternative:
-
-- use `py -3 scripts/modelctl.py remote-deepseek ...` when you want to register a hosted DeepSeek model behind the internal adapter instead of pulling a local Ollama package
-- that path updates the `DEEPSEEK_*` adapter config in `.env`, writes the Copilot-facing model entry to `.vscode/settings.json`, and verifies tool calling directly against the upstream DeepSeek API when `toolCalling=true`
 
 Current limitation:
 
 - the local `DeepSeek V2 Lite` package remains chat-only because the current Ollama build reports that it does not support tools
+- the Gemma router shim is now validated for `gemma4:e2b`, `gemma4:e4b`, `gemma4:26b`, and `gemma4:31b`
+- cloud-backed Ollama tags such as `:cloud` and cloud-only aliases such as `deepseek-v4-pro` are intentionally unsupported; `modelctl.py` and `pull_all_models.py` reject them before registration or pull
 
 Example:
 
@@ -511,11 +522,12 @@ Example:
 py -3 scripts/modelctl.py add \
     --env-file .env \
     --settings-file .vscode/settings.json \
-    --model-id deepseek-r1:8b \
-    --display-name "DeepSeek R1 8B" \
-    --max-input-tokens 32768 \
+    --model-id gemma4:e4b \
+    --display-name "Gemma 4 E4B (Edge)" \
+    --max-input-tokens 131072 \
     --max-output-tokens 8192 \
-    --tool-calling false \
+    --tool-calling true \
+    --vision true \
     --thinking true \
     --streaming true \
     --set-default false \
@@ -542,28 +554,11 @@ py -3 scripts/modelctl.py add \
 
 That path now pulls the model into Ollama first, then verifies a tool call plus tool-result round-trip through the local Nginx route, and only then writes `toolCalling=true` into the registered model entry.
 
-Remote DeepSeek example:
-
-```powershell
-py -3 scripts/modelctl.py remote-deepseek \
-    --env-file .env \
-    --settings-file .vscode/settings.json \
-    --model-id deepseek-v4-pro \
-    --display-name "DeepSeek V4 Pro" \
-    --api-base-url https://api.deepseek.com \
-    --api-token-file ..\ai-tunnel-secrets\deepseek-api-token \
-    --max-input-tokens 1000000 \
-    --max-output-tokens 8192 \
-    --tool-calling true \
-    --thinking true \
-    --streaming true \
-    --env-slot agent \
-    --set-default true
-```
-
-That path enables the internal DeepSeek adapter configuration in `.env`, keeps the Copilot-facing URL on the repo's public `/v1` endpoint, and verifies the upstream hosted model with the same full tool round-trip requirement before it records `toolCalling=true`.
+If you want every shared local catalog entry pulled into Ollama up front, run `py -3 scripts/pull_all_models.py --env-file .env --settings-file .vscode/settings.json` or the `Stack: Pull All Local Models` task. That helper pulls the env-backed defaults plus every model id in `.vscode/settings.json`, de-duplicates them, and refuses cloud-backed Ollama ids.
 
 If you prefer the editor workflow, run the `Models: Add Or Update Model` task from the Command Palette.
+
+If you want the pinned Gemma convenience flow, run `Models: Pull + Register Gemma 4 E4B` for registration, `Models: Pull + Smoke Test Gemma 4 E4B` for a chat validation pass, and `Models: Probe Gemma 4 E4B Tool Calling` if you want to recheck the local agent path on that machine.
 
 If you want the repo-managed agent slot instead of a one-off model entry, run `Models: Configure DeepSeek Math V2 Large Agent` for the default large-profile setup or `Models: Add Or Update Agent Model` for another tool-capable Ollama model id.
 
@@ -628,11 +623,12 @@ This split makes local validation possible before you provide real Cloudflare cr
 
 The Nginx config is shaped specifically for Copilot-compatible API traffic:
 
-- `/v1/*` is proxied to Ollama's OpenAI-compatible API
+- `/v1/*` is proxied to the local model-router OpenAI-compatible surface
 - `/api/*` can optionally proxy the raw Ollama API
 - `Authorization` is preserved upstream
 - `proxy_buffering off` and `proxy_request_buffering off` are enabled
 - long proxy read and send timeouts are configured
+- the model-router upstream timeout is configurable with `MODEL_ROUTER_TIMEOUT_SECS` so larger local models can finish cold-starting before the request is aborted
 - unauthenticated API requests return JSON `401`
 - the admin hostname can use Basic Auth without affecting the API hostname
 

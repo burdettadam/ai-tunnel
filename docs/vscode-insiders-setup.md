@@ -118,11 +118,24 @@ Use this repo's default model profile:
 - model id: `deepseek-v2:16b-lite-chat-q4_K_M`
 - current example Ollama tag behind the proxy: `deepseek-v2:16b-lite-chat-q4_K_M`
 
+Shared local catalog entries also ship for Gemma 4 weight profiles:
+
+- `gemma4:e2b` as a lightweight edge profile
+- `gemma4:e4b` as the pinned convenience Gemma profile for this repo
+- `gemma4:26b` as the workstation MoE profile
+- `gemma4:31b` as the workstation dense profile
+
 Optional agent-mode profile:
 
 - the repo now preconfigures `OLLAMA_AGENT_MODEL=milkey/deepseek-v2.5-1210:IQ1_S` as the default large agent profile for machines that can host the 47 GB Ollama package
 - `DeepSeek V2 Lite` remains the default chat profile and is kept chat-only because the current Ollama package does not expose tools
 - keep `OLLAMA_AGENT_MODEL_TOOL_CALLING=true` only for a model that actually passes the tool-calling smoke test
+- use `Stack: Pull All Local Models` or `scripts/pull_all_models.py` if you want the entire shared local catalog pulled into Ollama before validation
+- `gemma4:e2b` now passes the local tool-calling probe through the model-router compatibility shim and can be exposed in agent mode
+- `gemma4:e4b` now passes the local tool-calling probe through the model-router compatibility shim and can be exposed in agent mode
+- `gemma4:26b` now passes the local tool-calling probe through the model-router compatibility shim and can be exposed in agent mode on the current GPU-backed stack
+- `gemma4:31b` now passes the local tool-calling probe through the model-router compatibility shim and can be exposed in agent mode on the current GPU-backed stack
+- cloud-backed Ollama tags such as `:cloud` and cloud-only aliases such as `deepseek-v4-pro` are intentionally unsupported in this repo
 - the bootstrap helper now mirrors both the default chat profile and the optional agent profile into VS Code user settings
 
 The display label in VS Code can be friendlier than the backing package name, but the model id sent to the OpenAI-compatible endpoint needs to match the actual Ollama model id unless you add a dedicated translation layer in front of Ollama.
@@ -153,6 +166,26 @@ For users who want a declarative model entry in user settings, this is the shape
       "vision": false,
       "thinking": true,
       "streaming": true
+    },
+    "gemma4:e2b": {
+      "name": "Gemma 4 E2B (Edge)",
+      "url": "https://ollama-api.example.com/v1",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
+    },
+    "gemma4:e4b": {
+      "name": "Gemma 4 E4B (Edge)",
+      "url": "https://ollama-api.example.com/v1",
+      "maxInputTokens": 131072,
+      "maxOutputTokens": 8192,
+      "toolCalling": true,
+      "vision": true,
+      "thinking": true,
+      "streaming": true
     }
   }
 }
@@ -173,5 +206,9 @@ After configuration:
 2. Send a simple prompt and verify a response is returned.
 3. Send a longer prompt and confirm streaming feels incremental instead of buffered.
 4. If you want a small known-good proof first, run `Models: Pull + Smoke Test Proof Model (qwen2.5:3b)`.
-5. Run `Models: Configure DeepSeek Math V2 Large Agent` for the repo default large-profile setup on a fresh machine, or use `py -3 scripts/check_tool_calling.py --env-file .env --model-id <agent-model-id>` before marking another model agent-capable.
-6. If the model does not appear in agent mode, treat that as a tool-calling capability limitation rather than a tunnel failure.
+5. If you want the pinned Gemma profile locally, run `Models: Pull + Register Gemma 4 E4B` and `Models: Pull + Smoke Test Gemma 4 E4B`.
+6. If you want every shared local catalog model available first, run `Stack: Pull All Local Models`.
+7. Run `Models: Configure DeepSeek Math V2 Large Agent` for the repo default large-profile setup on a fresh machine, or use `py -3 scripts/check_tool_calling.py --env-file .env --model-id <agent-model-id>` before marking another model agent-capable.
+8. If you want the pinned Gemma profile in agent mode, run `Models: Probe Gemma 4 E4B Tool Calling` as a local recheck and then select `gemma4:e4b` from the model picker.
+9. If you want another Gemma 4 profile in agent mode, probe that exact tag first and only then promote it with `Models: Add Or Update Agent Model`.
+10. If the model does not appear in agent mode, treat that as a tool-calling capability limitation rather than a tunnel failure.

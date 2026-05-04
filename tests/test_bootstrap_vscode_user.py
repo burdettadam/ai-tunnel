@@ -224,59 +224,19 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
         self.assertEqual(model_entries["qwen2.5-coder:7b"]["maxOutputTokens"], 4096)
         self.assertIn("Registered model 'qwen2.5-coder:7b'", result.stdout)
 
-    def test_prefers_remote_deepseek_slot_metadata_when_present(self) -> None:
-        self.env_path.write_text(
-            textwrap.dedent(
-                """
-                OLLAMA_API_PUBLIC_URL=https://deepseek-api.example.com/v1
-                DEEPSEEK_CHAT_MODEL=deepseek-v4-flash
-                DEEPSEEK_CHAT_MODEL_DISPLAY_NAME=DeepSeek V4 Flash
-                DEEPSEEK_CHAT_MODEL_VSCODE_ID=deepseek-v4-flash
-                DEEPSEEK_CHAT_CONTEXT_LENGTH=1000000
-                DEEPSEEK_CHAT_MAX_OUTPUT_TOKENS=8192
-                DEEPSEEK_CHAT_MODEL_TOOL_CALLING=false
-                DEEPSEEK_CHAT_MODEL_THINKING=true
-                DEEPSEEK_CHAT_MODEL_STREAMING=true
-                DEEPSEEK_AGENT_MODEL=deepseek-v4-pro
-                DEEPSEEK_AGENT_MODEL_DISPLAY_NAME=DeepSeek V4 Pro
-                DEEPSEEK_AGENT_MODEL_VSCODE_ID=deepseek-v4-pro
-                DEEPSEEK_AGENT_CONTEXT_LENGTH=1000000
-                DEEPSEEK_AGENT_MAX_OUTPUT_TOKENS=8192
-                DEEPSEEK_AGENT_MODEL_TOOL_CALLING=true
-                DEEPSEEK_AGENT_MODEL_THINKING=true
-                DEEPSEEK_AGENT_MODEL_STREAMING=true
-                NGINX_API_TOKEN_FILE=../ai-tunnel-secrets/ollama-api-token
-                """
-            ).strip()
-            + "\n",
-            encoding="utf-8",
-        )
-
-        self.run_bootstrap()
-
-        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
-        model_entries = settings["github.copilot.chat.customOAIModels"]
-
-        self.assertIn("deepseek-v4-flash", model_entries)
-        self.assertIn("deepseek-v4-pro", model_entries)
-        self.assertEqual(model_entries["deepseek-v4-flash"]["url"], "https://deepseek-api.example.com/v1")
-        self.assertEqual(model_entries["deepseek-v4-flash"]["maxInputTokens"], 1000000)
-        self.assertFalse(model_entries["deepseek-v4-flash"]["toolCalling"])
-        self.assertTrue(model_entries["deepseek-v4-pro"]["toolCalling"])
-
     def test_merges_workspace_custom_models_into_user_settings(self) -> None:
         self.workspace_settings_path.parent.mkdir(parents=True, exist_ok=True)
         self.workspace_settings_path.write_text(
             json.dumps(
                 {
                     "github.copilot.chat.customOAIModels": {
-                        "qwen2.5:0.5b": {
-                            "name": "Qwen 2.5 0.5B (Local Smoke)",
+                        "gemma4:e4b": {
+                            "name": "Gemma 4 E4B (Edge)",
                             "url": "https://old.example.com/v1",
-                            "maxInputTokens": 32768,
-                            "maxOutputTokens": 2048,
+                            "maxInputTokens": 131072,
+                            "maxOutputTokens": 8192,
                             "toolCalling": False,
-                            "vision": False,
+                            "vision": True,
                             "thinking": True,
                             "streaming": True,
                         }
@@ -292,10 +252,12 @@ class BootstrapVSCodeUserTests(unittest.TestCase):
 
         settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
         model_entries = settings["github.copilot.chat.customOAIModels"]
-        self.assertIn("qwen2.5:0.5b", model_entries)
-        self.assertEqual(model_entries["qwen2.5:0.5b"]["name"], "Qwen 2.5 0.5B (Local Smoke)")
-        self.assertEqual(model_entries["qwen2.5:0.5b"]["url"], "https://ollama-api.example.com/v1")
-        self.assertFalse(model_entries["qwen2.5:0.5b"]["toolCalling"])
+        self.assertIn("gemma4:e4b", model_entries)
+        self.assertEqual(model_entries["gemma4:e4b"]["name"], "Gemma 4 E4B (Edge)")
+        self.assertEqual(model_entries["gemma4:e4b"]["url"], "https://ollama-api.example.com/v1")
+        self.assertEqual(model_entries["gemma4:e4b"]["maxInputTokens"], 131072)
+        self.assertTrue(model_entries["gemma4:e4b"]["vision"])
+        self.assertFalse(model_entries["gemma4:e4b"]["toolCalling"])
 
     def test_installs_byok_bootstrap_extension_when_extensions_dir_is_explicit(self) -> None:
         extensions_dir = self.root / "extensions"
