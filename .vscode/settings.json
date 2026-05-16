@@ -45,7 +45,7 @@
       "url": "https://ollama-api.korwynne.com/v1",
       "maxInputTokens": 262144,
       "maxOutputTokens": 8192,
-        "toolCalling": true,
+      "toolCalling": true,
       "vision": true,
       "thinking": true,
       "streaming": true
@@ -55,7 +55,7 @@
       "url": "https://ollama-api.korwynne.com/v1",
       "maxInputTokens": 262144,
       "maxOutputTokens": 8192,
-        "toolCalling": true,
+      "toolCalling": true,
       "vision": true,
       "thinking": true,
       "streaming": true
@@ -80,5 +80,6 @@
       "thinking": true,
       "streaming": true
     }
-  }
+  },
+  "task.allowAutomaticTasks": "on"
 }

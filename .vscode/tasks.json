@@ -27,20 +27,6 @@
       "detail": "Starts browser-playwright without requiring any GitHub token."
     },
     {
-      "label": "Stack: Start Local Services + LibreChat + GitHub MCP",
-      "type": "shell",
-      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-github.yaml --env-file .env up -d",
-      "problemMatcher": [],
-      "detail": "Requires GITHUB_PERSONAL_ACCESS_TOKEN in ../ai-tunnel-secrets/github-mcp.env for the GitHub MCP service."
-    },
-    {
-      "label": "Stack: Start Local Services + LibreChat + All MCP",
-      "type": "shell",
-      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-all.yaml --env-file .env up -d",
-      "problemMatcher": [],
-      "detail": "Starts Playwright plus GitHub MCP; GitHub still requires GITHUB_PERSONAL_ACCESS_TOKEN."
-    },
-    {
       "label": "Stack: Start Local Services + DeepSeek V4",
       "type": "shell",
       "command": "docker compose -f compose.yaml -f compose.deepseek-v4.yaml --env-file .env up -d",

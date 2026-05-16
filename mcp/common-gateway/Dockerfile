@@ -7,6 +7,8 @@ RUN apk add --no-cache git python3 py3-pip \
     && pip3 install --no-cache-dir --break-system-packages \
         "mcp-server-fetch==${MCP_FETCH_SERVER_VERSION}" \
         "mcp-server-git==${MCP_GIT_SERVER_VERSION}" \
+    && READABILIPY_JS_DIR=$(python3 -c "import inspect, os, readabilipy; print(os.path.join(os.path.dirname(inspect.getfile(readabilipy)), 'javascript'))") \
+    && npm --prefix "$READABILIPY_JS_DIR" install --omit=dev \
     && git config --system --add safe.directory /projects/repo
 
 ENTRYPOINT ["supergateway"]

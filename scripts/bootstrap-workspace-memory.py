@@ -88,6 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    args.workspace_root = args.workspace_root.resolve()
     install_bridge(args)
     scaffold_bridge(args)
     return 0

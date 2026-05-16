@@ -76,7 +76,8 @@ location /v1/ {
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/api-auth.inc;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass ${openai_proxy_pass_target};
+    set \$openai_upstream "${openai_proxy_pass_target}";
+    proxy_pass \$openai_upstream;
 }
 EOF
 
@@ -85,7 +86,8 @@ location /v1/ {
     default_type application/json;
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass ${openai_proxy_pass_target};
+    set \$openai_upstream "${openai_proxy_pass_target}";
+    proxy_pass \$openai_upstream;
 }
 EOF
 else
@@ -98,6 +100,8 @@ EOF
 EOF
 fi
 
+raw_proxy_pass_target="http://ollama:${OLLAMA_PORT:-11434}"
+
 if is_true "${ENABLE_RAW_OLLAMA_API:-true}"; then
     cat > "$include_dir/raw-api-location-api.inc" <<EOF
 location /api/ {
@@ -105,7 +109,8 @@ location /api/ {
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/api-auth.inc;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass http://ollama_upstream;
+    set \$ollama_upstream "${raw_proxy_pass_target}";
+    proxy_pass \$ollama_upstream;
 }
 EOF
 
@@ -114,7 +119,8 @@ location /api/ {
     default_type application/json;
     limit_req zone=api_limit burst=${NGINX_RATE_LIMIT_BURST} nodelay;
     include /etc/nginx/includes/proxy-common.inc;
-    proxy_pass http://ollama_upstream;
+    set \$ollama_upstream "${raw_proxy_pass_target}";
+    proxy_pass \$ollama_upstream;
 }
 EOF
 else

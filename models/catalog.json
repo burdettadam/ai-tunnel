@@ -13,7 +13,7 @@
       "backend": "ollama",
       "owned_by": "ollama",
       "displayName": "Qwen 2.5 0.5B (Local Smoke)",
-      "profiles": ["local-small", "local-medium", "server-gpu", "all"]
+      "profiles": ["local-smoke", "all"]
     },
     {
       "id": "qwen3:4b",

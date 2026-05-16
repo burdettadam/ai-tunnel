@@ -206,6 +206,7 @@ Fast path for a fresh clone:
 Known small proof model:
 
 - `qwen2.5:0.5b` is now wired in as a tiny local smoke model for quick chat-only stack checks when you want a fast local deployment before pulling anything larger
+- it is intentionally kept in the `local-smoke` router profile, not the default `local-small` LibreChat selector profile, because it is not reliable for MCP/tool-calling chats
 - `qwen2.5:3b` is the smallest model currently verified in this repo to prove the full Nginx-backed OpenAI-compatible path end to end, including `scripts/check_tool_calling.py`
 - use it when you want to prove the stack before starting a larger local DeepSeek V4 backend
 - `gemma4:e4b` is the pinned Gemma 4 convenience profile for this repo; treat the other Gemma 4 tags as separate weight-profile entries instead of aliases for the same model
@@ -267,7 +268,7 @@ Public repo hygiene:
 - keep `.env` local and treat [example.env](example.env) as the documented contract
 - do not commit `.data/`, `.copilot-bridge/`, or the generated `.vscode/mcp.json`
 - do not commit `.mempalace/` or `../ai-tunnel-secrets/librechat.env`
-- do not commit `../ai-tunnel-secrets/pubmed-mcp.env` or `../ai-tunnel-secrets/github-mcp.env`
+- do not commit `../ai-tunnel-secrets/pubmed-mcp.env`
 - keep secrets in the sibling `../ai-tunnel-secrets` directory, not in the repo
 
 ## Setup Guide
@@ -287,7 +288,6 @@ At minimum, review:
 - `CF_TUNNEL_TOKEN_FILE`
 - `LIBRECHAT_ENV_FILE`
 - `PUBMED_MCP_ENV_FILE`
-- `GITHUB_MCP_ENV_FILE`
 - `DEEPSEEK_V4_ENV_FILE`
 - `MODEL_ROUTER_PROFILE`
 - `OLLAMA_MODEL`
@@ -516,7 +516,7 @@ docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.y
 
 The repo git service mounts the working tree read-only and masks `.env`, `.data`, `.mempalace`, `.copilot-bridge`, `.sixth`, and `.pytest_cache`. It is intended for status, history, and diff context, not file editing. The web fetch service is for public web pages; do not send credentialed URLs or private tunnel URLs through it.
 
-For browser automation without any GitHub token, add the Playwright overlay after the common overlay:
+For browser automation, add the Playwright overlay after the common overlay:
 
 ```powershell
 docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-playwright.yaml --env-file .env up -d
@@ -524,17 +524,7 @@ docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.y
 
 The Playwright overlay adds `browser-playwright`: Microsoft Playwright MCP at `http://mcp-playwright:${MCP_PLAYWRIGHT_PORT}/mcp`, headless Chromium only, internal Docker network only.
 
-For GitHub context, use the GitHub overlay separately:
-
-```powershell
-py -3 scripts/bootstrap-secrets.py --env-file .env
-# Set GITHUB_PERSONAL_ACCESS_TOKEN in ../ai-tunnel-secrets/github-mcp.env before enabling GitHub MCP.
-docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-github.yaml --env-file .env up -d
-```
-
-The GitHub overlay adds `github-readonly`: official GitHub MCP server at `http://mcp-github:${MCP_GITHUB_PORT}/mcp`, started with `--read-only` and the configured `GITHUB_MCP_TOOLSETS`.
-
-If you intentionally want both GitHub and Playwright, use [compose.mcp-all.yaml](compose.mcp-all.yaml) after the common overlay. These overlays swap LibreChat to the matching `librechat/librechat.mcp-*.yaml` file so the base LibreChat path does not show tools whose containers are not running.
+Token-backed GitHub MCP is intentionally not included. That avoids accidental startup failures or prompt-visible tools that cannot run without a personal access token. The optional overlays only expose local/no-token tools whose containers are running.
 
 ### 5.2. Optionally start local DeepSeek V4
 
