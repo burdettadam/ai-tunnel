@@ -1,0 +1,36 @@
+services:
+  librechat:
+    depends_on:
+      mcp-playwright:
+        condition: service_started
+    environment:
+      MCP_PLAYWRIGHT_PORT: ${MCP_PLAYWRIGHT_PORT:-8005}
+    volumes:
+      - ./librechat/librechat.mcp-playwright.yaml:/app/librechat.yaml:ro
+
+  mcp-playwright:
+    image: ${MCP_PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/mcp@sha256:d238ec7bc98cc4e22df0696d6031dad5b8a4b46781f4f0abaa3bfadeedb43b9a}
+    restart: unless-stopped
+    entrypoint:
+      - node
+    command:
+      - /app/cli.js
+      - --headless
+      - --browser
+      - chromium
+      - --no-sandbox
+      - --host
+      - 0.0.0.0
+      - --port
+      - "${MCP_PLAYWRIGHT_PORT:-8005}"
+      - --allowed-hosts
+      - "*"
+      - --isolated
+      - --image-responses
+      - omit
+      - --codegen
+      - none
+    expose:
+      - "${MCP_PLAYWRIGHT_PORT:-8005}"
+    networks:
+      - internal

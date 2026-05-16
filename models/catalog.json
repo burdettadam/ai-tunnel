@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen2.5:3b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Qwen 2.5 3B (Chat + Agent)",
+      "profiles": ["local-small", "local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "qwen2.5:0.5b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Qwen 2.5 0.5B (Local Smoke)",
+      "profiles": ["local-small", "local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "qwen3:4b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Qwen 3 4B",
+      "profiles": ["local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "qwen2.5-coder:7b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Qwen 2.5 Coder 7B (Agent)",
+      "profiles": ["local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "gemma4:e2b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Gemma 4 E2B (Edge)",
+      "profiles": ["local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "gemma4:e4b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Gemma 4 E4B (Edge)",
+      "profiles": ["local-medium", "server-gpu", "all"]
+    },
+    {
+      "id": "gemma4:26b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Gemma 4 26B (Workstation MoE)",
+      "profiles": ["server-gpu", "all"]
+    },
+    {
+      "id": "gemma4:31b",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "Gemma 4 31B (Workstation Dense)",
+      "profiles": ["server-gpu", "all"]
+    },
+    {
+      "id": "deepseek-v2:16b-lite-chat-q4_K_M",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "DeepSeek V2 Lite",
+      "profiles": ["legacy-ollama-deepseek", "all"]
+    },
+    {
+      "id": "milkey/deepseek-v2.5-1210:IQ1_S",
+      "backend": "ollama",
+      "owned_by": "ollama",
+      "displayName": "DeepSeek Math V2 Large (IQ1_S)",
+      "profiles": ["legacy-ollama-deepseek", "server-gpu", "all"]
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "backend": "deepseek-v4",
+      "owned_by": "deepseek-v4-local",
+      "displayName": "DeepSeek V4 Flash",
+      "modelPath": "deepseek-ai/DeepSeek-V4-Flash",
+      "requestModelId": "deepseek-v4-flash",
+      "profiles": ["deepseek-v4", "server-gpu", "all"]
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "backend": "deepseek-v4",
+      "owned_by": "deepseek-v4-local",
+      "displayName": "DeepSeek V4 Pro",
+      "modelPath": "deepseek-ai/DeepSeek-V4-Pro",
+      "requestModelId": "deepseek-v4-pro",
+      "profiles": ["deepseek-v4", "server-gpu", "all"]
+    }
+  ]
+}

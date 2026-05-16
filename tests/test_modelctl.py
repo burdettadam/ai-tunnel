@@ -233,7 +233,7 @@ class ModelCtlTests(unittest.TestCase):
         self.assertNotIn("OLLAMA_MODEL=gemma4:e4b", env_text)
         self.assertEqual(len(_ProbeRequestHandler.requests), 0)
 
-    def test_cloud_backed_model_ids_are_rejected(self) -> None:
+    def test_deepseek_v4_alias_is_rejected_as_ollama_model(self) -> None:
         self.write_env(11436)
 
         result = self.run_modelctl(
@@ -252,8 +252,37 @@ class ModelCtlTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Cloud-backed Ollama model ids are not supported in this repo", result.stderr)
+        self.assertIn("served by the local DeepSeek V4 overlay, not Ollama", result.stderr)
         self.assertFalse(self.settings_path.exists())
+        env_text = self.env_path.read_text(encoding="utf-8")
+        self.assertNotIn("OLLAMA_AGENT_MODEL=deepseek-v4-pro", env_text)
+
+    def test_deepseek_v4_alias_can_be_registered_as_router_model(self) -> None:
+        self.write_env(11436)
+
+        result = self.run_modelctl(
+            "--model-id",
+            "deepseek-v4-pro",
+            "--display-name",
+            "DeepSeek V4 Pro",
+            "--tool-calling",
+            "true",
+            "--backend",
+            "router",
+            "--set-default",
+            "false",
+            "--pull",
+            "false",
+            "--skip-tool-verification",
+            "true",
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        settings = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        entry = settings["github.copilot.chat.customOAIModels"]["deepseek-v4-pro"]
+        self.assertEqual(entry["name"], "DeepSeek V4 Pro")
+        self.assertEqual(entry["url"], "https://ollama-api.example.com/v1")
+        self.assertTrue(entry["toolCalling"])
         env_text = self.env_path.read_text(encoding="utf-8")
         self.assertNotIn("OLLAMA_AGENT_MODEL=deepseek-v4-pro", env_text)
 

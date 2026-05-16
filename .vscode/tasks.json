@@ -8,6 +8,69 @@
       "problemMatcher": []
     },
     {
+      "label": "Stack: Start Local Services + LibreChat",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml --env-file .env up -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + Common MCP",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml --env-file .env up -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + Playwright MCP",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-playwright.yaml --env-file .env up -d",
+      "problemMatcher": [],
+      "detail": "Starts browser-playwright without requiring any GitHub token."
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + GitHub MCP",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-github.yaml --env-file .env up -d",
+      "problemMatcher": [],
+      "detail": "Requires GITHUB_PERSONAL_ACCESS_TOKEN in ../ai-tunnel-secrets/github-mcp.env for the GitHub MCP service."
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + All MCP",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.mcp-all.yaml --env-file .env up -d",
+      "problemMatcher": [],
+      "detail": "Starts Playwright plus GitHub MCP; GitHub still requires GITHUB_PERSONAL_ACCESS_TOKEN."
+    },
+    {
+      "label": "Stack: Start Local Services + DeepSeek V4",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.deepseek-v4.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check NVIDIA GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + DeepSeek V4",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.deepseek-v4.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check NVIDIA GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat + Common MCP + DeepSeek V4",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml -f compose.deepseek-v4.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check NVIDIA GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "label": "Stack: Check NVIDIA GPU Support",
       "type": "shell",
       "command": "py",
@@ -48,6 +111,16 @@
       "label": "Stack: Start Local Services (GPU / NVIDIA)",
       "type": "shell",
       "command": "docker compose -f compose.yaml -f compose.gpu.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check NVIDIA GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Local Services + LibreChat (GPU / NVIDIA)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.gpu.yaml -f compose.librechat.yaml --env-file .env up -d",
       "dependsOn": [
         "Stack: Check NVIDIA GPU Support"
       ],
@@ -102,6 +175,16 @@
       "problemMatcher": []
     },
     {
+      "label": "Stack: Start Local Services + LibreChat (GPU / AMD ROCm)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.amd.yaml -f compose.librechat.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check AMD GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "label": "Stack: Check Vulkan GPU Support",
       "type": "shell",
       "command": "py",
@@ -149,9 +232,25 @@
       "problemMatcher": []
     },
     {
+      "label": "Stack: Start Local Services + LibreChat (GPU / Vulkan)",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.vulkan.yaml -f compose.librechat.yaml --env-file .env up -d",
+      "dependsOn": [
+        "Stack: Check Vulkan GPU Support"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "label": "Stack: Pull Default Model",
       "type": "shell",
       "command": "docker compose --env-file .env --profile init run --rm ollama-pull",
+      "problemMatcher": []
+    },
+    {
+      "label": "LibreChat: Pull RAG Embeddings Model",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml --env-file .env --profile init run --rm ollama-pull-librechat-embeddings",
       "problemMatcher": []
     },
     {
@@ -410,6 +509,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Stack: Start Tunnel + LibreChat",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml --env-file .env --profile tunnel up -d cloudflared",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stack: Start Tunnel + LibreChat + Common MCP",
+      "type": "shell",
+      "command": "docker compose -f compose.yaml -f compose.librechat.yaml -f compose.mcp-common.yaml --env-file .env --profile tunnel up -d cloudflared",
+      "problemMatcher": []
+    },
+    {
       "label": "Stack: Smoke Test",
       "type": "shell",
       "command": "./scripts/smoke-test.sh",
@@ -591,6 +702,38 @@
         ".env"
       ],
       "problemMatcher": []
+    },
+    {
+      "label": "LibreChat: Lock Registration",
+      "type": "shell",
+      "command": "py",
+      "windows": {
+        "command": "py"
+      },
+      "linux": {
+        "command": "python3",
+        "args": [
+          "scripts/lock-librechat-registration.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "osx": {
+        "command": "python3",
+        "args": [
+          "scripts/lock-librechat-registration.py",
+          "--env-file",
+          ".env"
+        ]
+      },
+      "args": [
+        "-3",
+        "scripts/lock-librechat-registration.py",
+        "--env-file",
+        ".env"
+      ],
+      "problemMatcher": [],
+      "detail": "Run after creating the first LibreChat admin account and before publishing the LibreChat Cloudflare route."
     },
     {
       "label": "Stack: Rotate API Token",
@@ -1356,25 +1499,25 @@
       "id": "modelId",
       "type": "promptString",
       "description": "Ollama model id or weight profile tag",
-      "default": "deepseek-v2:16b-lite-chat-q4_K_M"
+      "default": "qwen2.5:3b"
     },
     {
       "id": "displayName",
       "type": "promptString",
       "description": "Display name in VS Code",
-      "default": "DeepSeek V2 Lite"
+      "default": "Qwen 2.5 3B (Chat + Agent)"
     },
     {
       "id": "agentModelId",
       "type": "promptString",
       "description": "Tool-capable Ollama model id for agent mode",
-      "default": "milkey/deepseek-v2.5-1210:IQ1_S"
+      "default": "qwen2.5:3b"
     },
     {
       "id": "agentDisplayName",
       "type": "promptString",
       "description": "Tool-capable display name for agent mode",
-      "default": "DeepSeek Math V2 Large (IQ1_S)"
+      "default": "Qwen 2.5 3B (Chat + Agent)"
     },
     {
       "id": "maxInputTokens",

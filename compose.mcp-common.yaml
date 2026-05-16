@@ -1,0 +1,82 @@
+services:
+  librechat:
+    depends_on:
+      mcp-fetch:
+        condition: service_started
+      mcp-git:
+        condition: service_started
+    environment:
+      MCP_FETCH_PORT: ${MCP_FETCH_PORT:-8002}
+      MCP_GIT_PORT: ${MCP_GIT_PORT:-8003}
+    volumes:
+      - ./librechat/librechat.mcp-common.yaml:/app/librechat.yaml:ro
+
+  mcp-fetch:
+    image: ${MCP_COMMON_GATEWAY_IMAGE:-ai-tunnel/mcp-common-gateway:2026.1.14}
+    build:
+      context: ./mcp/common-gateway
+      args:
+        MCP_FETCH_SERVER_VERSION: ${MCP_FETCH_SERVER_VERSION:-2025.4.7}
+        MCP_GIT_SERVER_VERSION: ${MCP_GIT_SERVER_VERSION:-2026.1.14}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --stdio
+      - "mcp-server-fetch"
+      - --outputTransport
+      - sse
+      - --port
+      - "${MCP_FETCH_PORT:-8002}"
+      - --ssePath
+      - /sse
+      - --messagePath
+      - /message
+      - --logLevel
+      - info
+    expose:
+      - "${MCP_FETCH_PORT:-8002}"
+    networks:
+      - internal
+
+  mcp-git:
+    image: ${MCP_COMMON_GATEWAY_IMAGE:-ai-tunnel/mcp-common-gateway:2026.1.14}
+    build:
+      context: ./mcp/common-gateway
+      args:
+        MCP_FETCH_SERVER_VERSION: ${MCP_FETCH_SERVER_VERSION:-2025.4.7}
+        MCP_GIT_SERVER_VERSION: ${MCP_GIT_SERVER_VERSION:-2026.1.14}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --stdio
+      - "mcp-server-git --repository /projects/repo"
+      - --outputTransport
+      - sse
+      - --port
+      - "${MCP_GIT_PORT:-8003}"
+      - --ssePath
+      - /sse
+      - --messagePath
+      - /message
+      - --logLevel
+      - info
+    expose:
+      - "${MCP_GIT_PORT:-8003}"
+    volumes:
+      - ./:/projects/repo:ro
+      - ./mcp/redacted/env.redacted:/projects/repo/.env:ro
+      - ./mcp/redacted/empty:/projects/repo/.data:ro
+      - ./mcp/redacted/empty:/projects/repo/.mempalace:ro
+      - ./mcp/redacted/empty:/projects/repo/.copilot-bridge:ro
+      - ./mcp/redacted/empty:/projects/repo/.sixth:ro
+      - ./mcp/redacted/empty:/projects/repo/.pytest_cache:ro
+    networks:
+      - internal

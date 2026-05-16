@@ -13,7 +13,8 @@ from check_tool_calling import (
 )
 
 
-CLOUD_ONLY_MODEL_IDS = {
+NON_OLLAMA_LOCAL_MODEL_IDS = {
+    "deepseek-v4-flash",
     "deepseek-v4-pro",
 }
 
@@ -27,15 +28,32 @@ def parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
 
 
-def validate_local_model_id(model_id: str) -> str:
+def validate_ollama_model_id(model_id: str) -> str:
     normalized = model_id.strip()
     lowered = normalized.lower()
     if not normalized:
         raise ValueError("Model id must not be empty")
-    if lowered.endswith(":cloud") or lowered in CLOUD_ONLY_MODEL_IDS:
+    if lowered.endswith(":cloud"):
         raise ValueError(
             f"Cloud-backed Ollama model ids are not supported in this repo: {normalized}. "
             "Use a locally pullable model id instead."
+        )
+    if lowered in NON_OLLAMA_LOCAL_MODEL_IDS:
+        raise ValueError(
+            f"{normalized} is served by the local DeepSeek V4 overlay, not Ollama. "
+            "Start compose.deepseek-v4.yaml and register the router-facing model without an Ollama pull."
+        )
+    return normalized
+
+
+def validate_router_model_id(model_id: str) -> str:
+    normalized = model_id.strip()
+    if not normalized:
+        raise ValueError("Model id must not be empty")
+    if normalized.lower().endswith(":cloud"):
+        raise ValueError(
+            f"Cloud-backed Ollama model ids are not supported in this repo: {normalized}. "
+            "Use a local model-router backend instead."
         )
     return normalized
 
@@ -146,7 +164,14 @@ def register_model(args: argparse.Namespace) -> int:
     if not env_path.exists():
         raise FileNotFoundError(f"Missing env file: {env_path}")
 
-    args.model_id = validate_local_model_id(args.model_id)
+    if args.backend == "ollama":
+        args.model_id = validate_ollama_model_id(args.model_id)
+    else:
+        args.model_id = validate_router_model_id(args.model_id)
+        if args.pull:
+            raise ValueError("Only Ollama-backed models can be pulled with modelctl.py")
+        if args.set_default:
+            raise ValueError("Only Ollama-backed models can update OLLAMA_* defaults")
 
     env_updates = build_env_updates(args)
 
@@ -198,7 +223,7 @@ def register_model(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage Ollama and VS Code model metadata for this repo")
+    parser = argparse.ArgumentParser(description="Manage local model-router and VS Code model metadata for this repo")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     add_parser = subparsers.add_parser("add", help="Register a model in VS Code settings and optionally set it as default and pull it")
@@ -212,6 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.add_argument("--vision", type=parse_bool, default=False)
     add_parser.add_argument("--thinking", type=parse_bool, default=True)
     add_parser.add_argument("--streaming", type=parse_bool, default=True)
+    add_parser.add_argument("--backend", choices=["ollama", "router"], default="ollama")
     add_parser.add_argument("--env-slot", choices=["default", "agent"], default="default")
     add_parser.add_argument("--set-default", type=parse_bool, default=False)
     add_parser.add_argument("--skip-tool-verification", type=parse_bool, default=False)

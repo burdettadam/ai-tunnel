@@ -1,0 +1,106 @@
+version: 1.3.10
+cache: true
+
+endpoints:
+  custom:
+    - name: "AI Tunnel"
+      apiKey: "ollama"
+      baseURL: "http://model-router:${MODEL_ROUTER_PORT}/v1/"
+      models:
+        default:
+          - "${OLLAMA_MODEL}"
+          - "${OLLAMA_AGENT_MODEL}"
+        fetch: true
+      titleConvo: true
+      titleModel: "current_model"
+      summarize: false
+      summaryModel: "current_model"
+      modelDisplayLabel: "AI Tunnel"
+
+mcpSettings:
+  allowedAddresses:
+    - "mcp-memory:39741"
+    - "mcp-filesystem:8001"
+    - "mcp-pubmed-general:3010"
+    - "mcp-pubmed-systematic:3011"
+    - "mcp-pubmed-trends:3012"
+    - "mcp-fetch:8002"
+    - "mcp-git:8003"
+    - "mcp-playwright:8005"
+
+mcpServers:
+  workspace-memory:
+    type: streamable-http
+    url: "http://mcp-memory:${MCP_MEMORY_PORT}/mcp"
+    timeout: 120000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+
+  repo-filesystem:
+    type: sse
+    url: "http://mcp-filesystem:${MCP_FILESYSTEM_PORT}/sse"
+    timeout: 120000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+
+  pubmed-general-research:
+    type: streamable-http
+    url: "http://mcp-pubmed-general:${MCP_PUBMED_GENERAL_PORT}/mcp"
+    timeout: 120000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this PubMed tool group for general biomedical literature research. Prefer focused PubMed queries, fetch article metadata before citing findings, and distinguish abstracts, PMC full text, and open-access full text in the answer.
+
+  pubmed-systematic-review:
+    type: streamable-http
+    url: "http://mcp-pubmed-systematic:${MCP_PUBMED_SYSTEMATIC_PORT}/mcp"
+    timeout: 180000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this PubMed tool group for systematic-review style work. Make search strategy explicit, preserve query strings and filters, prefer MeSH-aware searches when useful, track inclusion and exclusion decisions, and export citations when requested.
+
+  pubmed-research-trends:
+    type: streamable-http
+    url: "http://mcp-pubmed-trends:${MCP_PUBMED_TRENDS_PORT}/mcp"
+    timeout: 180000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this PubMed tool group for research trend analysis. Compare publication patterns over time, identify MeSH terms, journals, author clusters, related articles, and citation context, and avoid treating publication volume as evidence of clinical consensus.
+
+  web-fetch:
+    type: sse
+    url: "http://mcp-fetch:${MCP_FETCH_PORT}/sse"
+    timeout: 120000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this fetch tool for public web pages only. Do not fetch credentialed URLs, private tunnel URLs, or local metadata endpoints, and cite the fetched source when using it in an answer.
+
+  repo-git:
+    type: sse
+    url: "http://mcp-git:${MCP_GIT_PORT}/sse"
+    timeout: 120000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this read-only git tool for repository status, history, diffs, and commit context. The mounted worktree is read-only and masks known local secret/data paths.
+
+  browser-playwright:
+    type: streamable-http
+    url: "http://mcp-playwright:${MCP_PLAYWRIGHT_PORT}/mcp"
+    timeout: 180000
+    initTimeout: 30000
+    chatMenu: true
+    startup: true
+    serverInstructions: |
+      Use this browser tool only when page rendering or interaction is necessary. Avoid logging into accounts or entering secrets through the browser session.

@@ -1,0 +1,279 @@
+services:
+  librechat:
+    image: ${LIBRECHAT_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      model-router:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+      librechat-mongodb:
+        condition: service_started
+      librechat-meilisearch:
+        condition: service_started
+      librechat-rag-api:
+        condition: service_started
+      mcp-memory:
+        condition: service_started
+      mcp-filesystem:
+        condition: service_started
+      mcp-pubmed-general:
+        condition: service_started
+      mcp-pubmed-systematic:
+        condition: service_started
+      mcp-pubmed-trends:
+        condition: service_started
+    env_file:
+      - path: ${LIBRECHAT_ENV_FILE}
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${LIBRECHAT_PORT}
+      CONFIG_PATH: /app/librechat.yaml
+      DOMAIN_CLIENT: ${LIBRECHAT_PUBLIC_URL}
+      DOMAIN_SERVER: ${LIBRECHAT_PUBLIC_URL}
+      MONGO_URI: mongodb://librechat-mongodb:27017/LibreChat
+      MEILI_HOST: http://librechat-meilisearch:7700
+      RAG_API_URL: http://librechat-rag-api:${LIBRECHAT_RAG_PORT}
+      MODEL_ROUTER_PORT: ${MODEL_ROUTER_PORT:-11436}
+      OLLAMA_MODEL: ${OLLAMA_MODEL}
+      OLLAMA_AGENT_MODEL: ${OLLAMA_AGENT_MODEL}
+      MCP_MEMORY_PORT: ${MCP_MEMORY_PORT}
+      MCP_FILESYSTEM_PORT: ${MCP_FILESYSTEM_PORT}
+      MCP_PUBMED_GENERAL_PORT: ${MCP_PUBMED_GENERAL_PORT}
+      MCP_PUBMED_SYSTEMATIC_PORT: ${MCP_PUBMED_SYSTEMATIC_PORT}
+      MCP_PUBMED_TRENDS_PORT: ${MCP_PUBMED_TRENDS_PORT}
+    ports:
+      - "127.0.0.1:${LIBRECHAT_PORT}:${LIBRECHAT_PORT}"
+    expose:
+      - "${LIBRECHAT_PORT}"
+    volumes:
+      - ./librechat/librechat.yaml:/app/librechat.yaml:ro
+      - ${LIBRECHAT_ENV_FILE}:/app/.env:ro
+      - ./.data/librechat/images:/app/client/public/images
+      - ./.data/librechat/uploads:/app/uploads
+      - ./.data/librechat/logs:/app/logs
+    networks:
+      - internal
+
+  librechat-mongodb:
+    image: ${LIBRECHAT_MONGODB_IMAGE}
+    restart: unless-stopped
+    command: mongod --noauth
+    volumes:
+      - ./.data/librechat/mongodb:/data/db
+    networks:
+      - internal
+
+  librechat-meilisearch:
+    image: ${LIBRECHAT_MEILISEARCH_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - path: ${LIBRECHAT_ENV_FILE}
+        required: false
+    environment:
+      MEILI_HOST: http://librechat-meilisearch:7700
+      MEILI_NO_ANALYTICS: "true"
+    expose:
+      - "7700"
+    volumes:
+      - ./.data/librechat/meilisearch:/meili_data
+    networks:
+      - internal
+
+  librechat-vectordb:
+    image: ${LIBRECHAT_PGVECTOR_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - path: ${LIBRECHAT_ENV_FILE}
+        required: false
+    expose:
+      - "5432"
+    volumes:
+      - ./.data/librechat/pgvector:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  librechat-rag-api:
+    image: ${LIBRECHAT_RAG_API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      librechat-vectordb:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+    env_file:
+      - path: ${LIBRECHAT_ENV_FILE}
+        required: false
+    environment:
+      DB_HOST: librechat-vectordb
+      DB_PORT: "5432"
+      RAG_HOST: 0.0.0.0
+      RAG_PORT: ${LIBRECHAT_RAG_PORT}
+      EMBEDDINGS_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:${OLLAMA_PORT}
+      EMBEDDINGS_MODEL: ${LIBRECHAT_RAG_EMBEDDINGS_MODEL}
+    expose:
+      - "${LIBRECHAT_RAG_PORT}"
+    networks:
+      - internal
+
+  ollama-pull-librechat-embeddings:
+    image: ${OLLAMA_IMAGE}
+    restart: "no"
+    profiles:
+      - init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:${OLLAMA_PORT}
+    command: ["pull", "${LIBRECHAT_RAG_EMBEDDINGS_MODEL}"]
+    volumes:
+      - ./${OLLAMA_MODELS_PATH}:/root/.ollama
+    networks:
+      - internal
+
+  mcp-memory:
+    image: ${MCP_MEMORY_IMAGE}
+    build:
+      context: ./mcp/workspace-memory-bridge
+      args:
+        WORKSPACE_MEMORY_BRIDGE_REF: ${WORKSPACE_MEMORY_BRIDGE_REF}
+    restart: unless-stopped
+    environment:
+      HOME: /workspace
+      WORKSPACE_ROOT: /workspace
+      MEMPALACE_BRIDGE_DIR: /workspace/.copilot-bridge
+      MEMPALACE_PALACE_PATH: /workspace/.mempalace/palace
+      MEMPALACE_DEFAULT_WING: ai-tunnel
+      WORKSPACE_MEMORY_ROOM_PREFIX: ai-tunnel
+      MEMPALACE_AUTO_FORWARD: "true"
+      WORKSPACE_MEMORY_ALLOWED_ORIGINS: ${LIBRECHAT_PUBLIC_URL}
+    command:
+      - --workspace-root
+      - /workspace
+      - --host
+      - 0.0.0.0
+      - --port
+      - "${MCP_MEMORY_PORT}"
+      - --path
+      - /mcp
+    expose:
+      - "${MCP_MEMORY_PORT}"
+    volumes:
+      - ./.mempalace:/workspace/.mempalace
+      - ./.copilot-bridge:/workspace/.copilot-bridge
+      - ./mempalace.yaml:/workspace/mempalace.yaml:ro
+    networks:
+      - internal
+
+  mcp-filesystem:
+    image: ${MCP_FILESYSTEM_GATEWAY_IMAGE}
+    build:
+      context: ./mcp/filesystem-gateway
+      args:
+        MCP_FILESYSTEM_SERVER_VERSION: ${MCP_FILESYSTEM_SERVER_VERSION}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --stdio
+      - "mcp-server-filesystem /projects/repo"
+      - --outputTransport
+      - sse
+      - --port
+      - "${MCP_FILESYSTEM_PORT}"
+      - --ssePath
+      - /sse
+      - --messagePath
+      - /message
+      - --logLevel
+      - info
+    expose:
+      - "${MCP_FILESYSTEM_PORT}"
+    volumes:
+      - ./README.md:/projects/repo/README.md:ro
+      - ./example.env:/projects/repo/example.env:ro
+      - ./compose.yaml:/projects/repo/compose.yaml:ro
+      - ./compose.gpu.yaml:/projects/repo/compose.gpu.yaml:ro
+      - ./compose.amd.yaml:/projects/repo/compose.amd.yaml:ro
+      - ./compose.vulkan.yaml:/projects/repo/compose.vulkan.yaml:ro
+      - ./compose.librechat.yaml:/projects/repo/compose.librechat.yaml:ro
+      - ./compose.deepseek-v4.yaml:/projects/repo/compose.deepseek-v4.yaml:ro
+      - ./mempalace.yaml:/projects/repo/mempalace.yaml:ro
+      - ./models:/projects/repo/models:ro
+      - ./docs:/projects/repo/docs:ro
+      - ./scripts:/projects/repo/scripts:ro
+      - ./tests:/projects/repo/tests:ro
+      - ./nginx:/projects/repo/nginx:ro
+      - ./librechat:/projects/repo/librechat:ro
+      - ./.vscode/settings.json:/projects/repo/.vscode/settings.json:ro
+      - ./.vscode/tasks.json:/projects/repo/.vscode/tasks.json:ro
+    networks:
+      - internal
+
+  mcp-pubmed-general:
+    image: ${PUBMED_MCP_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - path: ${PUBMED_MCP_ENV_FILE}
+        required: false
+    environment:
+      MCP_TRANSPORT_TYPE: http
+      MCP_HTTP_PORT: ${MCP_PUBMED_GENERAL_PORT}
+      MCP_HTTP_ENDPOINT_PATH: /mcp
+      MCP_AUTH_MODE: none
+      MCP_LOG_LEVEL: info
+      STORAGE_PROVIDER_TYPE: in-memory
+      OTEL_ENABLED: "false"
+    expose:
+      - "${MCP_PUBMED_GENERAL_PORT}"
+    networks:
+      - internal
+
+  mcp-pubmed-systematic:
+    image: ${PUBMED_MCP_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - path: ${PUBMED_MCP_ENV_FILE}
+        required: false
+    environment:
+      MCP_TRANSPORT_TYPE: http
+      MCP_HTTP_PORT: ${MCP_PUBMED_SYSTEMATIC_PORT}
+      MCP_HTTP_ENDPOINT_PATH: /mcp
+      MCP_AUTH_MODE: none
+      MCP_LOG_LEVEL: info
+      STORAGE_PROVIDER_TYPE: in-memory
+      OTEL_ENABLED: "false"
+    expose:
+      - "${MCP_PUBMED_SYSTEMATIC_PORT}"
+    networks:
+      - internal
+
+  mcp-pubmed-trends:
+    image: ${PUBMED_MCP_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - path: ${PUBMED_MCP_ENV_FILE}
+        required: false
+    environment:
+      MCP_TRANSPORT_TYPE: http
+      MCP_HTTP_PORT: ${MCP_PUBMED_TRENDS_PORT}
+      MCP_HTTP_ENDPOINT_PATH: /mcp
+      MCP_AUTH_MODE: none
+      MCP_LOG_LEVEL: info
+      STORAGE_PROVIDER_TYPE: in-memory
+      OTEL_ENABLED: "false"
+    expose:
+      - "${MCP_PUBMED_TRENDS_PORT}"
+    networks:
+      - internal
+
+  cloudflared:
+    depends_on:
+      librechat:
+        condition: service_started

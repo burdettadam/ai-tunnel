@@ -1,6 +1,8 @@
 .env
 .data/
 .copilot-bridge/
+.mempalace/
+.sixth/
 .vscode/mcp.json
 __pycache__/
 .pytest_cache/

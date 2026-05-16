@@ -28,6 +28,12 @@ services:
       OLLAMA_PORT: ${OLLAMA_PORT}
       MODEL_ROUTER_TIMEOUT_SECS: ${MODEL_ROUTER_TIMEOUT_SECS:-300}
       MODEL_ROUTER_CACHE_TTL_SECS: ${MODEL_ROUTER_CACHE_TTL_SECS:-30}
+      MODEL_ROUTER_CATALOG_FILE: /opt/router/model-catalog.json
+      MODEL_ROUTER_PROFILE: ${MODEL_ROUTER_PROFILE:-local-small}
+      MODEL_ROUTER_EXTRA_MODELS: ${MODEL_ROUTER_EXTRA_MODELS:-}
+      DEEPSEEK_V4_ENABLED: ${DEEPSEEK_V4_ENABLED:-false}
+      DEEPSEEK_V4_BASE_URL: ${DEEPSEEK_V4_BASE_URL:-}
+      PYTHONUNBUFFERED: "1"
     command:
       - /bin/sh
       - -c
@@ -42,6 +48,7 @@ services:
       - "${MODEL_ROUTER_PORT:-11436}"
     volumes:
       - ./scripts/model_router.py:/opt/router/model_router.py:ro
+      - ./models/catalog.json:/opt/router/model-catalog.json:ro
     networks:
       - internal
 

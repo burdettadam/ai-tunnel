@@ -1,0 +1,47 @@
+services:
+  model-router:
+    depends_on:
+      deepseek-v4:
+        condition: service_started
+    environment:
+      DEEPSEEK_V4_ENABLED: "true"
+      DEEPSEEK_V4_BASE_URL: http://deepseek-v4:${DEEPSEEK_V4_PORT:-30000}
+      MODEL_ROUTER_EXTRA_MODELS: ${MODEL_ROUTER_EXTRA_MODELS:-deepseek-v4-flash,deepseek-v4-pro}
+
+  deepseek-v4:
+    image: ${DEEPSEEK_V4_IMAGE:-lmsysorg/sglang:latest}
+    restart: unless-stopped
+    env_file:
+      - path: ${DEEPSEEK_V4_ENV_FILE:-../ai-tunnel-secrets/deepseek-v4.env}
+        required: false
+    environment:
+      HF_HOME: /data/huggingface
+      DEEPSEEK_V4_MODEL: ${DEEPSEEK_V4_MODEL:-deepseek-ai/DeepSeek-V4-Flash}
+      DEEPSEEK_V4_MODEL_ALIAS: ${DEEPSEEK_V4_MODEL_ALIAS:-deepseek-v4-flash}
+      DEEPSEEK_V4_PORT: ${DEEPSEEK_V4_PORT:-30000}
+      DEEPSEEK_V4_TENSOR_PARALLEL_SIZE: ${DEEPSEEK_V4_TENSOR_PARALLEL_SIZE:-1}
+      DEEPSEEK_V4_EXTRA_ARGS: ${DEEPSEEK_V4_EXTRA_ARGS:-}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -n "$${HF_TOKEN:-}" ]; then
+          export HUGGING_FACE_HUB_TOKEN="$${HF_TOKEN}"
+        fi
+        exec python3 -m sglang.launch_server \
+          --model-path "${DEEPSEEK_V4_MODEL}" \
+          --served-model-name "${DEEPSEEK_V4_MODEL_ALIAS}" \
+          --host 0.0.0.0 \
+          --port "${DEEPSEEK_V4_PORT}" \
+          --tp "${DEEPSEEK_V4_TENSOR_PARALLEL_SIZE}" \
+          ${DEEPSEEK_V4_EXTRA_ARGS}
+    expose:
+      - "${DEEPSEEK_V4_PORT:-30000}"
+    volumes:
+      - ./${DEEPSEEK_V4_CACHE_PATH:-.data/huggingface}:/data/huggingface
+    shm_size: ${DEEPSEEK_V4_SHM_SIZE:-16gb}
+    ipc: host
+    gpus: all
+    networks:
+      - internal

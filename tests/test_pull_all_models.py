@@ -144,14 +144,18 @@ class PullAllModelsTests(unittest.TestCase):
         self.assertIn("exec ollama ollama pull gemma4:e4b", docker_commands[5])
         self.assertIn("exec ollama ollama pull qwen2.5:3b", docker_commands[6])
 
-    def test_pull_all_models_rejects_cloud_backed_ids(self) -> None:
+    def test_pull_all_models_skips_local_deepseek_v4_non_ollama_ids(self) -> None:
+        docker_log_path = self.root / "docker.log"
+        docker_path = self.make_fake_docker(docker_log_path)
         self.write_env()
-        self.write_settings(["deepseek-v4-pro"])
+        self.write_settings(["deepseek-v4-pro", "qwen2.5:3b"])
 
-        result = self.run_script()
+        result = self.run_script(extra_env={"MODEL_PULL_DOCKER_COMMAND": str(docker_path)})
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Cloud-backed Ollama model ids are not supported in this repo", result.stderr)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Skipping non-Ollama local model 'deepseek-v4-pro'", result.stdout)
+        docker_commands = docker_log_path.read_text(encoding="utf-8").splitlines()
+        self.assertTrue(all("deepseek-v4-pro" not in command for command in docker_commands))
 
 
 if __name__ == "__main__":

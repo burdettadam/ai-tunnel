@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from modelctl import read_env_file, validate_local_model_id
+from modelctl import NON_OLLAMA_LOCAL_MODEL_IDS, read_env_file, validate_ollama_model_id
 
 
 def docker_command() -> str:
@@ -33,7 +33,11 @@ def collect_model_ids(env_values: dict[str, str], settings: dict) -> list[str]:
     seen: set[str] = set()
 
     def add(candidate: str) -> None:
-        normalized = validate_local_model_id(candidate)
+        normalized_candidate = candidate.strip()
+        if normalized_candidate.lower() in NON_OLLAMA_LOCAL_MODEL_IDS:
+            print(f"Skipping non-Ollama local model '{normalized_candidate}'")
+            return
+        normalized = validate_ollama_model_id(normalized_candidate)
         if normalized in seen:
             return
         seen.add(normalized)
